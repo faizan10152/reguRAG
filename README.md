@@ -144,6 +144,7 @@ uv run --extra rag regurag eval-retrieval \
 ```
 
 See [docs/retrieval_evaluation.md](docs/retrieval_evaluation.md) for metric definitions and the current baseline snapshot.
+See [docs/retrieval_experiments.md](docs/retrieval_experiments.md) for the running experiment log.
 
 ## Why BM25 First?
 

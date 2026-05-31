@@ -77,15 +77,12 @@ Dense model: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
 | Retriever | Answerable Questions | Source Recall@5 | Source Hit@5 | Source MRR | Citation-Labeled Questions | Citation Recall@5 | Citation Hit@5 | Citation MRR |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | BM25 | 32 | 0.641 | 0.938 | 0.769 | 12 | 0.083 | 0.083 | 0.017 |
-
-Previous MiniLM dense and hybrid source-level snapshot:
-
-| Retriever | Answerable Questions | Source Recall@5 | Source Hit@5 | Source MRR |
-| --- | ---: | ---: | ---: | ---: |
-| Dense Qdrant | 32 | 0.469 | 0.750 | 0.555 |
-| Hybrid RRF | 32 | 0.625 | 0.906 | 0.724 |
+| Dense Qdrant | 32 | 0.469 | 0.750 | 0.555 | 12 | 0.111 | 0.167 | 0.125 |
+| Hybrid RRF | 32 | 0.625 | 0.906 | 0.724 | 12 | 0.111 | 0.167 | 0.111 |
 
 BM25 is currently strongest. That is plausible for this corpus because legal and regulatory queries often contain exact terms, article numbers, acronyms, and domain phrases. Dense retrieval is still useful, but the first local model is intentionally small and not yet tuned.
+
+See `docs/retrieval_experiments.md` for the running experiment log.
 
 ## What This Tells Us
 
