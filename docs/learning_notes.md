@@ -130,3 +130,18 @@ Cons:
 - model changes require reindexing
 
 For this project, dense retrieval is implemented with sentence-transformers and Qdrant. BM25 remains in place because legal retrieval often needs exact terms.
+
+## Retrieval Evaluation
+
+Retrieval evaluation asks a narrower question than answer evaluation: did the system retrieve the right evidence?
+
+Current metrics:
+
+- Recall@K: how many expected source documents appeared in the top K results.
+- Precision@K: how much of the top K came from expected sources.
+- Hit@K: whether at least one expected source appeared.
+- MRR: how early the first expected source appeared.
+
+Best practice: compare retrieval methods before adding an LLM. Otherwise a generated answer can hide weak retrieval, and you will not know whether the failure came from retrieval or generation.
+
+Current result: BM25 beats the first dense model on the approved benchmark. This is useful evidence, not a bad sign. In regulatory corpora, exact terms, article names, and German legal vocabulary often make lexical retrieval very competitive.

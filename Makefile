@@ -1,4 +1,4 @@
-.PHONY: install test lint pre-commit-install api docker-up qdrant-up download chunk search dense-index dense-search compare
+.PHONY: install test lint pre-commit-install api docker-up qdrant-up download chunk search dense-index dense-search compare eval-retrieval eval-retrieval-local
 
 install:
 	uv venv --python 3.11
@@ -39,3 +39,9 @@ dense-search:
 
 compare:
 	uv run --extra rag regurag compare-retrieval --chunks data/processed/chunks.jsonl --query "$(q)"
+
+eval-retrieval:
+	uv run regurag eval-retrieval --chunks data/processed/chunks.jsonl --questions data/eval/golden_questions_v1.jsonl --retrievers bm25 --output-md reports/retrieval_eval_latest.md --output-json reports/retrieval_eval_latest.json
+
+eval-retrieval-local:
+	uv run --extra rag regurag eval-retrieval --chunks data/processed/chunks.jsonl --questions data/eval/golden_questions_v1.jsonl --retrievers bm25,dense,hybrid --qdrant-path .qdrant/local --output-md reports/retrieval_eval_latest.md --output-json reports/retrieval_eval_latest.json

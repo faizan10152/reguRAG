@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 from pathlib import Path
 
 from regurag.embeddings.encoder import (
@@ -8,7 +9,12 @@ from regurag.embeddings.encoder import (
     EmbeddingConfig,
     SentenceTransformerEmbedder,
 )
-from regurag.evaluation.runner import evaluate_bm25_source_recall, load_golden_questions
+from regurag.evaluation.runner import (
+    evaluate_retrieval_runs,
+    load_golden_questions,
+    write_json_report,
+    write_markdown_report,
+)
 from regurag.ingestion.chunking import chunk_text
 from regurag.ingestion.download import download_sources
 from regurag.ingestion.manifest import load_source_manifest
@@ -21,8 +27,10 @@ from regurag.retrieval.dense_qdrant import (
 )
 from regurag.retrieval.fusion import reciprocal_rank_fusion
 from regurag.sample_data import sample_chunks
-from regurag.schemas import RetrievalResult
+from regurag.schemas import Chunk, RetrievalResult
 from regurag.storage.jsonl import read_chunks_jsonl, write_chunks_jsonl
+
+EVAL_RETRIEVERS = {"bm25", "dense", "hybrid"}
 
 
 def _find_raw_source(raw_dir: Path, source_id: str) -> Path | None:
@@ -168,25 +176,120 @@ def _compare_retrieval(args: argparse.Namespace) -> None:
     _print_results(fused_results)
 
 
+def _parse_eval_retrievers(raw_value: str) -> list[str]:
+    retrievers = [value.strip() for value in raw_value.split(",") if value.strip()]
+    unknown = sorted(set(retrievers) - EVAL_RETRIEVERS)
+    if unknown:
+        raise SystemExit(
+            f"Unknown retriever(s): {', '.join(unknown)}. "
+            f"Use one or more of: {', '.join(sorted(EVAL_RETRIEVERS))}."
+        )
+    if not retrievers:
+        raise SystemExit("At least one retriever must be selected.")
+    return retrievers
+
+
+def _cached_search(
+    search: Callable[[str], list[RetrievalResult]],
+) -> Callable[[str], list[RetrievalResult]]:
+    cache: dict[str, list[RetrievalResult]] = {}
+
+    def wrapped(query: str) -> list[RetrievalResult]:
+        if query not in cache:
+            cache[query] = search(query)
+        return cache[query]
+
+    return wrapped
+
+
+def _build_eval_retriever_runs(
+    args: argparse.Namespace,
+    chunks: list[Chunk],
+) -> dict[str, Callable[[str], list[RetrievalResult]]]:
+    selected = _parse_eval_retrievers(args.retrievers)
+    candidate_k = max(args.candidate_k, args.top_k)
+    runs: dict[str, Callable[[str], list[RetrievalResult]]] = {}
+
+    bm25_retriever: SimpleBM25Retriever | None = None
+    bm25_search: Callable[[str], list[RetrievalResult]] | None = None
+
+    def get_bm25_search() -> Callable[[str], list[RetrievalResult]]:
+        nonlocal bm25_retriever, bm25_search
+        if bm25_search is None:
+            bm25_retriever = SimpleBM25Retriever(chunks)
+            bm25_search = _cached_search(lambda query: bm25_retriever.search(query, top_k=candidate_k))
+        return bm25_search
+
+    dense_search: Callable[[str], list[RetrievalResult]] | None = None
+    if "dense" in selected or "hybrid" in selected:
+        embedder = _build_embedder(args)
+        dense_retriever = QdrantDenseRetriever(
+            url=args.qdrant_url,
+            collection_name=args.collection,
+            location=args.qdrant_location,
+            path=args.qdrant_path,
+        )
+        dense_search = _cached_search(
+            lambda query: dense_retriever.search(
+                query_vector=embedder.encode_query(query),
+                top_k=candidate_k,
+            )
+        )
+
+    for retriever in selected:
+        if retriever == "bm25":
+            runs["bm25"] = get_bm25_search()
+        elif retriever == "dense":
+            if dense_search is None:
+                raise SystemExit("Dense retrieval could not be initialized.")
+            runs["dense_qdrant"] = dense_search
+        elif retriever == "hybrid":
+            if dense_search is None:
+                raise SystemExit("Hybrid retrieval needs dense retrieval.")
+            bm25 = get_bm25_search()
+            runs["hybrid_rrf"] = _cached_search(
+                lambda query, bm25_search=bm25, dense_search=dense_search: reciprocal_rank_fusion(
+                    [bm25_search(query), dense_search(query)],
+                    top_k=candidate_k,
+                )
+            )
+
+    return runs
+
+
 def _eval_retrieval(args: argparse.Namespace) -> None:
     chunks = read_chunks_jsonl(args.chunks)
     if not chunks:
         raise SystemExit(f"No chunks found at {args.chunks}. Run the chunk command first.")
 
     questions = load_golden_questions(args.questions)
-    report = evaluate_bm25_source_recall(chunks, questions, top_k=args.top_k)
+    candidate_k = max(args.candidate_k, args.top_k)
+    runs = _build_eval_retriever_runs(args, chunks)
+    report = evaluate_retrieval_runs(
+        questions=questions,
+        retriever_runs=runs,
+        top_k=args.top_k,
+        candidate_k=candidate_k,
+    )
 
-    print(f"questions={len(report.rows)}")
-    print(f"answerable_questions={len(report.answerable_rows)}")
-    print(f"mean_source_recall_at_{args.top_k}={report.mean_source_recall_at_k:.3f}")
-
-    for row in report.rows:
-        expected = ",".join(sorted(row.relevant_sources)) or "unanswerable"
-        retrieved = ",".join(row.retrieved_sources) or "none"
+    print(f"questions={len(questions)}")
+    print(f"top_k={args.top_k}")
+    print(f"candidate_k={candidate_k}")
+    for summary in report.summaries():
         print(
-            f"{row.question_id}: recall={row.source_recall_at_k:.3f} "
-            f"expected={expected} retrieved={retrieved}"
+            f"{summary.retriever}: "
+            f"answerable={summary.answerable_rows} "
+            f"recall@{args.top_k}={summary.source_recall_at_k:.3f} "
+            f"hit@{args.top_k}={summary.source_hit_rate_at_k:.3f} "
+            f"mrr={summary.source_mrr:.3f}"
         )
+
+    if args.output_json:
+        write_json_report(report, args.output_json)
+        print(f"wrote JSON report to {args.output_json}")
+    if args.output_md:
+        write_markdown_report(report, args.output_md)
+        print(f"wrote Markdown report to {args.output_md}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -266,11 +369,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     eval_retrieval = subparsers.add_parser(
         "eval-retrieval",
-        help="Evaluate BM25 source-level recall on a JSONL golden set.",
+        help="Evaluate source-level retrieval quality on a JSONL golden set.",
     )
     eval_retrieval.add_argument("--chunks", required=True)
     eval_retrieval.add_argument("--questions", required=True)
+    eval_retrieval.add_argument(
+        "--retrievers",
+        default="bm25",
+        help="Comma-separated retrievers to evaluate: bm25,dense,hybrid.",
+    )
     eval_retrieval.add_argument("--top-k", type=int, default=5)
+    eval_retrieval.add_argument("--candidate-k", type=int, default=20)
+    eval_retrieval.add_argument("--qdrant-url", default=DEFAULT_QDRANT_URL)
+    eval_retrieval.add_argument("--qdrant-location", default=None)
+    eval_retrieval.add_argument("--qdrant-path", default=None)
+    eval_retrieval.add_argument("--collection", default=DEFAULT_COLLECTION)
+    eval_retrieval.add_argument("--model", default=DEFAULT_EMBEDDING_MODEL)
+    eval_retrieval.add_argument("--batch-size", type=int, default=16)
+    eval_retrieval.add_argument("--query-prefix", default="")
+    eval_retrieval.add_argument("--document-prefix", default="")
+    eval_retrieval.add_argument("--output-json", default=None)
+    eval_retrieval.add_argument("--output-md", default=None)
     eval_retrieval.set_defaults(func=_eval_retrieval)
 
     return parser

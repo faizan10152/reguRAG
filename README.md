@@ -28,7 +28,8 @@ This first version contains the production-shaped foundation:
 - Dense retrieval commands backed by Qdrant and sentence-transformers.
 - Reciprocal rank fusion utility for future hybrid retrieval.
 - Citation extraction and validation helpers.
-- Retrieval metrics: Recall@K, Precision@K, MRR.
+- Retrieval evaluation over an approved 38-question golden set.
+- Retrieval metrics: Recall@K, Precision@K, Hit@K, MRR.
 - FastAPI shell with retrieval-only `/query` endpoint.
 - Docker Compose with API and Qdrant.
 - GitHub Actions CI for tests and linting.
@@ -121,6 +122,29 @@ uv run --extra rag regurag dense-index \
   --batch-size 4
 ```
 
+Retrieval evaluation:
+
+```bash
+uv run regurag eval-retrieval \
+  --chunks data/processed/chunks.jsonl \
+  --questions data/eval/golden_questions_v1.jsonl \
+  --retrievers bm25
+```
+
+Full local BM25 + dense + hybrid evaluation without Docker:
+
+```bash
+uv run --extra rag regurag eval-retrieval \
+  --chunks data/processed/chunks.jsonl \
+  --questions data/eval/golden_questions_v1.jsonl \
+  --retrievers bm25,dense,hybrid \
+  --qdrant-path .qdrant/local \
+  --output-md reports/retrieval_eval_latest.md \
+  --output-json reports/retrieval_eval_latest.json
+```
+
+See [docs/retrieval_evaluation.md](docs/retrieval_evaluation.md) for metric definitions and the current baseline snapshot.
+
 ## Why BM25 First?
 
 BM25 is a keyword retrieval algorithm. It is not "old-fashioned"; it is still useful in legal and regulatory RAG because exact terms matter:
@@ -135,16 +159,15 @@ Dense vector search is better at semantic similarity, but it can miss exact term
 
 ## Next Milestones
 
-1. Add dense retrieval evaluation over the golden set.
-2. Add hybrid retrieval: BM25 + dense + reciprocal rank fusion.
-3. Add cross-encoder reranking.
-4. Add LLM answer generation through LiteLLM.
-5. Enforce structured answer JSON with citations.
-6. Build a 100-question golden evaluation set.
-7. Add Ragas and custom citation metrics.
-8. Add Langfuse tracing.
-9. Build a simple bilingual UI.
-10. Record a 3-minute demo and publish a project page.
+1. Tune dense retrieval and hybrid fusion using the golden set.
+2. Add cross-encoder reranking.
+3. Add LLM answer generation through LiteLLM.
+4. Enforce structured answer JSON with citations.
+5. Build a 100-question golden evaluation set with exact citation labels.
+6. Add Ragas and custom citation metrics.
+7. Add Langfuse tracing.
+8. Build a simple bilingual UI.
+9. Record a 3-minute demo and publish a project page.
 
 ## Portfolio Pitch
 

@@ -53,10 +53,10 @@ Current MVP:
 - BM25 lexical retrieval.
 - Qdrant-backed dense retrieval.
 - Reciprocal rank fusion utility.
+- Source-level retrieval evaluation for BM25, dense, and hybrid runs.
 
 Planned:
 
-- Dense retrieval evaluation.
 - Hybrid retrieval endpoint.
 - Cross-encoder reranking.
 
@@ -90,9 +90,12 @@ Initial metrics:
 
 - Recall@K
 - Precision@K
+- Hit@K
 - MRR
 - citation accuracy
 - refusal accuracy
+
+Current retrieval evaluation is source-level because the first golden set labels expected documents, not exact chunks. That gives a fast signal on whether the retriever found the right regulation or regulator source. The next evaluation layer should add exact citation labels for the most important questions.
 
 Later:
 

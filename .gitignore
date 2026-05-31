@@ -22,3 +22,6 @@ data/processed/*
 .qdrant/
 qdrant_storage/
 langfuse_storage/
+
+# Generated local evaluation reports.
+reports/

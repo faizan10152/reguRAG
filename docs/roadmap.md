@@ -38,16 +38,16 @@ Deliverable:
 ## Day 3: Dense Retrieval
 
 - Add Qdrant collection.
-- Use multilingual embeddings such as `BAAI/bge-m3`.
-- Compare BM25 vs dense retrieval on 20 questions.
+- Use multilingual embeddings for local dense retrieval.
+- Compare BM25 vs dense retrieval on the approved golden set.
 
 Deliverable:
 
-- Retrieval report with examples where BM25 wins and where dense retrieval wins.
+- Retrieval report with BM25, dense, and hybrid summary metrics.
 
 ## Day 4: Hybrid Retrieval and Reranking
 
-- Combine BM25 and dense retrieval with reciprocal rank fusion.
+- Tune BM25 and dense retrieval with reciprocal rank fusion.
 - Add cross-encoder reranker.
 - Log before/after top-k quality.
 
