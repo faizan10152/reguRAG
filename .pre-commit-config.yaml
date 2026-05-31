@@ -1,0 +1,23 @@
+repos:
+  - repo: local
+    hooks:
+      - id: project-guards
+        name: project guards
+        entry: uv run python scripts/check_project_guards.py
+        language: system
+        pass_filenames: true
+        always_run: true
+
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --extra dev ruff check .
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: tests
+        name: pytest
+        entry: uv run --extra dev pytest
+        language: system
+        pass_filenames: false
+        always_run: true

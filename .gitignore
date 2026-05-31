@@ -1,0 +1,24 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Data artifacts are reproducible from configs/source_manifest.json.
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Local model/vector database state.
+.qdrant/
+qdrant_storage/
+langfuse_storage/

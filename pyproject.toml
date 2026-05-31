@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "regurag"
+version = "0.1.0"
+description = "Production-style bilingual RAG assistant for AI Act, GDPR, and German regulatory guidance."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = { text = "MIT" }
+authors = [{ name = "Faizan" }]
+dependencies = []
+
+[project.optional-dependencies]
+api = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.8",
+  "pydantic-settings>=2.4",
+]
+ingestion = [
+  "pypdf>=5.0",
+]
+rag = [
+  "qdrant-client>=1.10",
+  "sentence-transformers>=3.0",
+  "rank-bm25>=0.2.2",
+  "litellm>=1.50",
+]
+eval = [
+  "ragas>=0.2",
+  "datasets>=2.20",
+  "pandas>=2.2",
+]
+observability = [
+  "langfuse>=2.50",
+]
+dev = [
+  "pre-commit>=4.0",
+  "pytest>=8.2",
+  "ruff>=0.6",
+  "mypy>=1.11",
+]
+
+[project.scripts]
+regurag = "regurag.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/regurag"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

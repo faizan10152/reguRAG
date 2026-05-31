@@ -1,0 +1,87 @@
+{
+  "project": "ReguRAG",
+  "description": "Official EU and German sources for a bilingual AI governance RAG assistant.",
+  "sources": [
+    {
+      "source_id": "eu_ai_act_en",
+      "title": "EU Artificial Intelligence Act",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1689",
+      "language": "en",
+      "jurisdiction": "EU",
+      "source_type": "regulation",
+      "domain_tags": ["ai_act", "governance", "risk"]
+    },
+    {
+      "source_id": "eu_ai_act_de",
+      "title": "EU KI-Verordnung",
+      "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/?uri=CELEX:32024R1689",
+      "language": "de",
+      "jurisdiction": "EU",
+      "source_type": "regulation",
+      "domain_tags": ["ai_act", "governance", "risk"]
+    },
+    {
+      "source_id": "gdpr_en",
+      "title": "General Data Protection Regulation",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016R0679",
+      "language": "en",
+      "jurisdiction": "EU",
+      "source_type": "regulation",
+      "domain_tags": ["gdpr", "privacy", "data_protection"]
+    },
+    {
+      "source_id": "gdpr_de",
+      "title": "Datenschutz-Grundverordnung",
+      "url": "https://eur-lex.europa.eu/legal-content/DE/TXT/?uri=CELEX:32016R0679",
+      "language": "de",
+      "jurisdiction": "EU",
+      "source_type": "regulation",
+      "domain_tags": ["gdpr", "privacy", "data_protection"]
+    },
+    {
+      "source_id": "bdsg_de",
+      "title": "Bundesdatenschutzgesetz",
+      "url": "https://www.gesetze-im-internet.de/bdsg_2018/BJNR209710017.html",
+      "language": "de",
+      "jurisdiction": "DE",
+      "source_type": "law",
+      "domain_tags": ["bdsg", "privacy", "germany"]
+    },
+    {
+      "source_id": "bnetza_ai_en",
+      "title": "Bundesnetzagentur Artificial Intelligence",
+      "url": "https://www.bundesnetzagentur.de/EN/Areas/Digitalisation/AI/start_ki.html",
+      "language": "en",
+      "jurisdiction": "DE",
+      "source_type": "regulator_guidance",
+      "domain_tags": ["ai_act", "germany", "regulator"]
+    },
+    {
+      "source_id": "bnetza_ai_literacy_de",
+      "title": "Bundesnetzagentur KI-Kompetenz",
+      "url": "https://www.bundesnetzagentur.de/DE/Fachthemen/Digitales/KI/7_Kompetenz/start.html",
+      "language": "de",
+      "jurisdiction": "DE",
+      "source_type": "regulator_guidance",
+      "domain_tags": ["ai_literacy", "germany", "regulator"]
+    },
+    {
+      "source_id": "bfdi_ki_fragen_de",
+      "title": "BfDI KI-Fragenkatalog",
+      "url": "https://www.bfdi.bund.de/SharedDocs/Downloads/DE/DokumenteBfDI/AccessForAll/2025/KI-Fragenkatalog.html",
+      "language": "de",
+      "jurisdiction": "DE",
+      "source_type": "regulator_guidance",
+      "domain_tags": ["privacy", "ai", "germany"]
+    },
+    {
+      "source_id": "dsk_ki_datenschutz_de",
+      "title": "DSK Orientierungshilfe KI und Datenschutz",
+      "url": "https://www.datenschutzkonferenz-online.de/media/oh/20240506_DSK_Orientierungshilfe_KI_und_Datenschutz.pdf",
+      "language": "de",
+      "jurisdiction": "DE",
+      "source_type": "regulator_guidance",
+      "domain_tags": ["privacy", "ai", "germany"]
+    }
+  ]
+}
