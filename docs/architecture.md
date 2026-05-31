@@ -95,7 +95,7 @@ Initial metrics:
 - citation accuracy
 - refusal accuracy
 
-Current retrieval evaluation is source-level because the first golden set labels expected documents, not exact chunks. That gives a fast signal on whether the retriever found the right regulation or regulator source. The next evaluation layer should add exact citation labels for the most important questions.
+Current retrieval evaluation has source-level labels for all answerable questions and exact citation labels for the first 12 high-value questions. Source-level scoring gives a fast signal on whether the retriever found the right regulation or regulator source. Citation-level scoring is stricter and checks whether the exact supporting chunk reached the top K.
 
 Later:
 

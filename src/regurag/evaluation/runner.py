@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from statistics import mean
 from typing import Any
@@ -36,6 +36,7 @@ class GoldenQuestion:
     language: str
     expected_sources: set[str]
     must_refuse: bool
+    expected_citations: set[str] = field(default_factory=set)
     domain: str = "unknown"
     question_type: str = "unknown"
     difficulty: str = "unknown"
@@ -53,6 +54,10 @@ class GoldenQuestion:
     def is_answerable(self) -> bool:
         return bool(self.expected_sources)
 
+    @property
+    def has_expected_citations(self) -> bool:
+        return bool(self.expected_citations)
+
 
 @dataclass(frozen=True)
 class RetrievalEvalRow:
@@ -66,12 +71,15 @@ class RetrievalEvalRow:
     structural_difficulty: str
     must_refuse: bool
     expected_sources: set[str]
+    expected_citations: set[str]
     retrieved_citations: list[str]
     retrieved_sources: list[str]
     unique_retrieved_sources: list[str]
     source_recall_at_k: float
     source_precision_at_k: float
     source_mrr: float
+    citation_recall_at_k: float
+    citation_mrr: float
 
     @property
     def is_answerable(self) -> bool:
@@ -82,8 +90,20 @@ class RetrievalEvalRow:
         return 1.0 if self.source_mrr > 0 else 0.0
 
     @property
+    def has_expected_citations(self) -> bool:
+        return bool(self.expected_citations)
+
+    @property
+    def citation_hit_at_k(self) -> float:
+        return 1.0 if self.citation_mrr > 0 else 0.0
+
+    @property
     def missing_sources(self) -> set[str]:
         return self.expected_sources - set(self.retrieved_sources)
+
+    @property
+    def missing_citations(self) -> set[str]:
+        return self.expected_citations - set(self.retrieved_citations)
 
 
 @dataclass(frozen=True)
@@ -95,6 +115,10 @@ class RetrievalEvalSummary:
     source_precision_at_k: float
     source_hit_rate_at_k: float
     source_mrr: float
+    citation_labeled_rows: int
+    citation_recall_at_k: float
+    citation_hit_rate_at_k: float
+    citation_mrr: float
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -105,6 +129,10 @@ class RetrievalEvalSummary:
             "source_precision_at_k": self.source_precision_at_k,
             "source_hit_rate_at_k": self.source_hit_rate_at_k,
             "source_mrr": self.source_mrr,
+            "citation_labeled_rows": self.citation_labeled_rows,
+            "citation_recall_at_k": self.citation_recall_at_k,
+            "citation_hit_rate_at_k": self.citation_hit_rate_at_k,
+            "citation_mrr": self.citation_mrr,
         }
 
 
@@ -123,6 +151,10 @@ class RetrievalEvalReport:
         return [row for row in self.rows if row.is_answerable]
 
     @property
+    def citation_labeled_rows(self) -> list[RetrievalEvalRow]:
+        return [row for row in self.rows if row.has_expected_citations]
+
+    @property
     def mean_source_recall_at_k(self) -> float:
         rows = self.answerable_rows
         if not rows:
@@ -135,7 +167,8 @@ class RetrievalEvalReport:
     def summary_for_retriever(self, retriever: str) -> RetrievalEvalSummary:
         rows = self.rows_for_retriever(retriever)
         answerable_rows = [row for row in rows if row.is_answerable]
-        return _summarize_rows(retriever, rows, answerable_rows)
+        citation_rows = [row for row in rows if row.has_expected_citations]
+        return _summarize_rows(retriever, rows, answerable_rows, citation_rows)
 
     def summaries(self) -> list[RetrievalEvalSummary]:
         return [self.summary_for_retriever(retriever) for retriever in self.retrievers]
@@ -148,7 +181,8 @@ class RetrievalEvalReport:
         output: list[dict[str, Any]] = []
         for (retriever, group_value), rows in sorted(grouped.items()):
             answerable_rows = [row for row in rows if row.is_answerable]
-            summary = _summarize_rows(retriever, rows, answerable_rows)
+            citation_rows = [row for row in rows if row.has_expected_citations]
+            summary = _summarize_rows(retriever, rows, answerable_rows, citation_rows)
             payload = summary.to_dict()
             payload[group_by] = group_value
             output.append(payload)
@@ -177,6 +211,7 @@ class RetrievalEvalReport:
                     "structural_difficulty": row.structural_difficulty,
                     "must_refuse": row.must_refuse,
                     "expected_sources": sorted(row.expected_sources),
+                    "expected_citations": sorted(row.expected_citations),
                     "retrieved_citations": row.retrieved_citations,
                     "retrieved_sources": row.retrieved_sources,
                     "unique_retrieved_sources": row.unique_retrieved_sources,
@@ -185,6 +220,10 @@ class RetrievalEvalReport:
                     "source_hit_at_k": row.source_hit_at_k,
                     "source_mrr": row.source_mrr,
                     "missing_sources": sorted(row.missing_sources),
+                    "citation_recall_at_k": row.citation_recall_at_k,
+                    "citation_hit_at_k": row.citation_hit_at_k,
+                    "citation_mrr": row.citation_mrr,
+                    "missing_citations": sorted(row.missing_citations),
                 }
                 for row in self.rows
             ],
@@ -195,28 +234,39 @@ def _summarize_rows(
     retriever: str,
     rows: list[RetrievalEvalRow],
     answerable_rows: list[RetrievalEvalRow],
+    citation_rows: list[RetrievalEvalRow],
 ) -> RetrievalEvalSummary:
-    if not answerable_rows:
-        return RetrievalEvalSummary(
-            retriever=retriever,
-            rows=len(rows),
-            answerable_rows=0,
-            source_recall_at_k=0.0,
-            source_precision_at_k=0.0,
-            source_hit_rate_at_k=0.0,
-            source_mrr=0.0,
-        )
+    source_recall = 0.0
+    source_precision = 0.0
+    source_hit_rate = 0.0
+    source_mrr = 0.0
+    if answerable_rows:
+        source_recall = mean(row.source_recall_at_k for row in answerable_rows)
+        source_precision = mean(row.source_precision_at_k for row in answerable_rows)
+        source_hit_rate = mean(row.source_hit_at_k for row in answerable_rows)
+        source_mrr = mean(row.source_mrr for row in answerable_rows)
+
+    citation_recall = 0.0
+    citation_hit_rate = 0.0
+    citation_mrr = 0.0
+    if citation_rows:
+        citation_recall = mean(row.citation_recall_at_k for row in citation_rows)
+        citation_hit_rate = mean(row.citation_hit_at_k for row in citation_rows)
+        citation_mrr = mean(row.citation_mrr for row in citation_rows)
 
     return RetrievalEvalSummary(
         retriever=retriever,
         rows=len(rows),
         answerable_rows=len(answerable_rows),
-        source_recall_at_k=mean(row.source_recall_at_k for row in answerable_rows),
-        source_precision_at_k=mean(row.source_precision_at_k for row in answerable_rows),
-        source_hit_rate_at_k=mean(row.source_hit_at_k for row in answerable_rows),
-        source_mrr=mean(row.source_mrr for row in answerable_rows),
+        source_recall_at_k=source_recall,
+        source_precision_at_k=source_precision,
+        source_hit_rate_at_k=source_hit_rate,
+        source_mrr=source_mrr,
+        citation_labeled_rows=len(citation_rows),
+        citation_recall_at_k=citation_recall,
+        citation_hit_rate_at_k=citation_hit_rate,
+        citation_mrr=citation_mrr,
     )
-
 
 def load_golden_questions(path: str | Path) -> list[GoldenQuestion]:
     questions: list[GoldenQuestion] = []
@@ -226,6 +276,7 @@ def load_golden_questions(path: str | Path) -> list[GoldenQuestion]:
                 continue
             payload = json.loads(line)
             expected_sources = payload.get("expected_sources", payload.get("relevant_sources", []))
+            expected_citations = payload.get("expected_citations", [])
             questions.append(
                 GoldenQuestion(
                     question_id=str(payload["id"]),
@@ -233,6 +284,7 @@ def load_golden_questions(path: str | Path) -> list[GoldenQuestion]:
                     language=str(payload["language"]),
                     expected_sources={str(source) for source in expected_sources},
                     must_refuse=bool(payload.get("must_refuse", False)),
+                    expected_citations={str(citation) for citation in expected_citations},
                     domain=str(payload.get("domain", "unknown")),
                     question_type=str(payload.get("type", payload.get("answer_type", "unknown"))),
                     difficulty=str(payload.get("difficulty", "unknown")),
@@ -271,6 +323,7 @@ def evaluate_retrieval_runs(
                     structural_difficulty=question.structural_difficulty,
                     must_refuse=question.must_refuse,
                     expected_sources=question.expected_sources,
+                    expected_citations=question.expected_citations,
                     retrieved_citations=retrieved_citations,
                     retrieved_sources=retrieved_sources,
                     unique_retrieved_sources=unique_sources,
@@ -287,6 +340,15 @@ def evaluate_retrieval_runs(
                     source_mrr=mean_reciprocal_rank(
                         retrieved_sources,
                         question.expected_sources,
+                    ),
+                    citation_recall_at_k=recall_at_k(
+                        retrieved_citations,
+                        question.expected_citations,
+                        top_k,
+                    ),
+                    citation_mrr=mean_reciprocal_rank(
+                        retrieved_citations,
+                        question.expected_citations,
                     ),
                 )
             )
@@ -328,8 +390,8 @@ def format_markdown_report(report: RetrievalEvalReport) -> str:
         "",
         "## Summary",
         "",
-        "| Retriever | Rows | Answerable | Recall@K | Precision@K | Hit@K | MRR |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Retriever | Rows | Answerable | Source Recall@K | Source Precision@K | Source Hit@K | Source MRR | Citation Labeled | Citation Recall@K | Citation Hit@K | Citation MRR |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for summary in report.summaries():
         lines.append(
@@ -340,12 +402,17 @@ def format_markdown_report(report: RetrievalEvalReport) -> str:
             f"{summary.source_recall_at_k:.3f} | "
             f"{summary.source_precision_at_k:.3f} | "
             f"{summary.source_hit_rate_at_k:.3f} | "
-            f"{summary.source_mrr:.3f} |"
+            f"{summary.source_mrr:.3f} | "
+            f"{summary.citation_labeled_rows} | "
+            f"{summary.citation_recall_at_k:.3f} | "
+            f"{summary.citation_hit_rate_at_k:.3f} | "
+            f"{summary.citation_mrr:.3f} |"
         )
 
     lines.extend(_format_breakdown_table(report, "domain", "Domain"))
     lines.extend(_format_breakdown_table(report, "structural_difficulty", "Structural Difficulty"))
     lines.extend(_format_worst_misses(report))
+    lines.extend(_format_citation_misses(report))
     lines.extend(_format_refusal_rows(report))
     return "\n".join(lines) + "\n"
 
@@ -404,6 +471,34 @@ def _format_worst_misses(report: RetrievalEvalReport, limit: int = 12) -> list[s
             f"{', '.join(sorted(row.missing_sources)) or '-'} | "
             f"{', '.join(row.unique_retrieved_sources) or '-'} | "
             f"{row.source_recall_at_k:.3f} |"
+        )
+    return lines
+
+
+def _format_citation_misses(report: RetrievalEvalReport, limit: int = 12) -> list[str]:
+    misses = [
+        row
+        for row in report.rows
+        if row.has_expected_citations
+        and (row.citation_recall_at_k < 1.0 or row.citation_mrr == 0.0)
+    ]
+    misses.sort(key=lambda row: (row.citation_recall_at_k, row.citation_mrr, row.question_id))
+
+    lines = [
+        "",
+        "## Citation-Labeled Misses",
+        "",
+        "| Retriever | Question | Missing Citations | Retrieved Citations | Citation Recall@K |",
+        "| --- | --- | --- | --- | ---: |",
+    ]
+    for row in misses[:limit]:
+        lines.append(
+            "| "
+            f"{row.retriever} | "
+            f"{row.question_id} | "
+            f"{', '.join(sorted(row.missing_citations)) or '-'} | "
+            f"{', '.join(row.retrieved_citations) or '-'} | "
+            f"{row.citation_recall_at_k:.3f} |"
         )
     return lines
 

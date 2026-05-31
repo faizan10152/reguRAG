@@ -79,9 +79,8 @@ Target first serious set:
 
 ## Next Step After Review
 
-For approved questions, the next benchmark layer will add:
+For approved questions, the benchmark layer now includes exact expected citation labels for the first 12 high-value questions. Future iterations will add:
 
-- exact expected citation labels
 - reference answers
 - required claims
 - forbidden unsupported claims

@@ -20,6 +20,7 @@ def test_load_golden_questions_accepts_approved_schema(tmp_path) -> None:
         "language": "en",
         "question": "Is AI CV screening high-risk?",
         "expected_sources": ["eu_ai_act_en"],
+        "expected_citations": ["eu_ai_act_en:aaaabbbbccccdddd"],
         "must_refuse": False,
         "review_status": "approved",
         "structural_difficulty": "semantic_paraphrase",
@@ -32,6 +33,7 @@ def test_load_golden_questions_accepts_approved_schema(tmp_path) -> None:
     assert questions[0].domain == "hr"
     assert questions[0].question_type == "scenario"
     assert questions[0].expected_sources == {"eu_ai_act_en"}
+    assert questions[0].expected_citations == {"eu_ai_act_en:aaaabbbbccccdddd"}
     assert questions[0].relevant_sources == {"eu_ai_act_en"}
 
 
@@ -65,6 +67,7 @@ def test_evaluate_retrieval_runs_scores_multiple_retrievers() -> None:
             question="employment high risk",
             language="en",
             expected_sources={"ai_act", "gdpr"},
+            expected_citations={"ai_act:aaaabbbbccccdddd", "gdpr:eeeeffff00001111"},
             must_refuse=False,
             domain="hr",
             structural_difficulty="multi_source",
@@ -90,6 +93,11 @@ def test_evaluate_retrieval_runs_scores_multiple_retrievers() -> None:
     strong_summary = report.summary_for_retriever("strong")
 
     assert weak_summary.source_recall_at_k == 0.5
+    assert weak_summary.citation_recall_at_k == 0.5
     assert strong_summary.source_recall_at_k == 1.0
+    assert strong_summary.citation_recall_at_k == 1.0
+    assert strong_summary.citation_hit_rate_at_k == 1.0
     assert report.breakdown("domain")[0]["domain"] == "hr"
-    assert "Retrieval Evaluation Report" in format_markdown_report(report)
+    markdown = format_markdown_report(report)
+    assert "Retrieval Evaluation Report" in markdown
+    assert "Citation-Labeled Misses" in markdown

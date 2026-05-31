@@ -141,7 +141,8 @@ Current metrics:
 - Precision@K: how much of the top K came from expected sources.
 - Hit@K: whether at least one expected source appeared.
 - MRR: how early the first expected source appeared.
+- Citation Recall@K: how many exact expected citation labels appeared in the top K results.
 
 Best practice: compare retrieval methods before adding an LLM. Otherwise a generated answer can hide weak retrieval, and you will not know whether the failure came from retrieval or generation.
 
-Current result: BM25 beats the first dense model on the approved benchmark. This is useful evidence, not a bad sign. In regulatory corpora, exact terms, article names, and German legal vocabulary often make lexical retrieval very competitive.
+Current result: BM25 beats the first dense model on source-level recall, but exact citation recall is much lower. This is useful evidence, not a bad sign. In regulatory corpora, finding the right document is easier than finding the exact paragraph or article needed for a grounded answer.

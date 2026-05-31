@@ -283,6 +283,14 @@ def _eval_retrieval(args: argparse.Namespace) -> None:
             f"hit@{args.top_k}={summary.source_hit_rate_at_k:.3f} "
             f"mrr={summary.source_mrr:.3f}"
         )
+        if summary.citation_labeled_rows:
+            print(
+                f"{summary.retriever}: "
+                f"citation_labeled={summary.citation_labeled_rows} "
+                f"citation_recall@{args.top_k}={summary.citation_recall_at_k:.3f} "
+                f"citation_hit@{args.top_k}={summary.citation_hit_rate_at_k:.3f} "
+                f"citation_mrr={summary.citation_mrr:.3f}"
+            )
 
     if args.output_json:
         write_json_report(report, args.output_json)

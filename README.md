@@ -29,7 +29,7 @@ This first version contains the production-shaped foundation:
 - Reciprocal rank fusion utility for future hybrid retrieval.
 - Citation extraction and validation helpers.
 - Retrieval evaluation over an approved 38-question golden set.
-- Retrieval metrics: Recall@K, Precision@K, Hit@K, MRR.
+- Source-level and citation-level retrieval metrics: Recall@K, Precision@K, Hit@K, MRR.
 - FastAPI shell with retrieval-only `/query` endpoint.
 - Docker Compose with API and Qdrant.
 - GitHub Actions CI for tests and linting.
