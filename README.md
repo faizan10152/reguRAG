@@ -25,6 +25,7 @@ This first version contains the production-shaped foundation:
 - Reproducible downloader for raw source files.
 - Text extraction and article-aware chunking utilities.
 - Transparent BM25 retrieval baseline.
+- Dense retrieval commands backed by Qdrant and sentence-transformers.
 - Reciprocal rank fusion utility for future hybrid retrieval.
 - Citation extraction and validation helpers.
 - Retrieval metrics: Recall@K, Precision@K, MRR.
@@ -102,6 +103,24 @@ Docker:
 docker compose up --build
 ```
 
+Dense retrieval:
+
+```bash
+docker compose up -d qdrant
+uv run --extra rag regurag dense-index --chunks data/processed/chunks.jsonl
+uv run --extra rag regurag dense-search --query "Can we train a model on customer support tickets?"
+uv run --extra rag regurag compare-retrieval --chunks data/processed/chunks.jsonl --query "Can we train a model on customer support tickets?"
+```
+
+The default embedding model is `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` because it is fast enough for local iteration. For a stronger portfolio run, switch to:
+
+```bash
+uv run --extra rag regurag dense-index \
+  --chunks data/processed/chunks.jsonl \
+  --model BAAI/bge-m3 \
+  --batch-size 4
+```
+
 ## Why BM25 First?
 
 BM25 is a keyword retrieval algorithm. It is not "old-fashioned"; it is still useful in legal and regulatory RAG because exact terms matter:
@@ -116,7 +135,7 @@ Dense vector search is better at semantic similarity, but it can miss exact term
 
 ## Next Milestones
 
-1. Add Qdrant dense indexing with `BAAI/bge-m3`.
+1. Add dense retrieval evaluation over the golden set.
 2. Add hybrid retrieval: BM25 + dense + reciprocal rank fusion.
 3. Add cross-encoder reranking.
 4. Add LLM answer generation through LiteLLM.

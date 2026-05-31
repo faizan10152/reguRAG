@@ -1,4 +1,4 @@
-.PHONY: install test lint pre-commit-install api docker-up download chunk search
+.PHONY: install test lint pre-commit-install api docker-up qdrant-up download chunk search dense-index dense-search compare
 
 install:
 	uv venv --python 3.11
@@ -19,6 +19,9 @@ api:
 docker-up:
 	docker compose up --build
 
+qdrant-up:
+	docker compose up -d qdrant
+
 download:
 	uv run regurag download --manifest configs/source_manifest.json --raw-dir data/raw
 
@@ -27,3 +30,12 @@ chunk:
 
 search:
 	uv run regurag search --chunks data/processed/chunks.jsonl --query "$(q)"
+
+dense-index:
+	uv run --extra rag regurag dense-index --chunks data/processed/chunks.jsonl
+
+dense-search:
+	uv run --extra rag regurag dense-search --query "$(q)"
+
+compare:
+	uv run --extra rag regurag compare-retrieval --chunks data/processed/chunks.jsonl --query "$(q)"

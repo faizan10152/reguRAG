@@ -111,3 +111,22 @@ uv run pre-commit run --all-files
 ```
 
 Best practice: keep fast checks in pre-commit. Expensive model downloads, dense indexing, and long RAG evaluations should run in CI or as explicit commands, not before every local commit.
+
+## Dense Retrieval
+
+Dense retrieval uses embeddings. An embedding model converts text into a vector of numbers. Texts with similar meanings should have vectors that are close together.
+
+Pros:
+
+- handles paraphrases better than BM25
+- helps with semantic queries
+- can improve cross-lingual retrieval
+
+Cons:
+
+- needs model downloads
+- needs a vector database or vector index
+- can miss exact legal terms
+- model changes require reindexing
+
+For this project, dense retrieval is implemented with sentence-transformers and Qdrant. BM25 remains in place because legal retrieval often needs exact terms.

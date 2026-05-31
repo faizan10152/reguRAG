@@ -51,12 +51,13 @@ Possible issue:
 Current MVP:
 
 - BM25 lexical retrieval.
+- Qdrant-backed dense retrieval.
+- Reciprocal rank fusion utility.
 
 Planned:
 
-- Dense retrieval with multilingual embeddings.
-- Sparse or BM25 retrieval.
-- Reciprocal rank fusion.
+- Dense retrieval evaluation.
+- Hybrid retrieval endpoint.
 - Cross-encoder reranking.
 
 Do not skip the baseline. Without a baseline, you cannot prove that embeddings improved the system.
