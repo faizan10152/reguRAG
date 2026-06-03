@@ -66,6 +66,25 @@ uv run --extra rag regurag eval-retrieval \
 
 `top-k` is the result window used for metrics. `candidate-k` is the larger retrieval window used before fusion.
 
+Hybrid reranking evaluation with the BGE-M3 index:
+
+```bash
+HF_HUB_DISABLE_XET=1 uv run --extra rag regurag eval-retrieval \
+  --chunks data/processed/chunks.jsonl \
+  --questions data/eval/golden_questions_v1.jsonl \
+  --retrievers bm25,dense,hybrid,hybrid-rerank \
+  --qdrant-path .qdrant/bge-m3 \
+  --model BAAI/bge-m3 \
+  --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 \
+  --top-k 5 \
+  --candidate-k 20 \
+  --reranker-batch-size 4 \
+  --output-md reports/retrieval_eval_rerank_latest.md \
+  --output-json reports/retrieval_eval_rerank_latest.json
+```
+
+Set `HF_HUB_DISABLE_XET=1` if Hugging Face model downloads create a 0-byte `.incomplete` file and do not progress. After models are cached, `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1` can be added for repeatable offline runs.
+
 ## Current Local Baseline
 
 Run date: 2026-05-31
@@ -84,6 +103,25 @@ BM25 is currently strongest. That is plausible for this corpus because legal and
 
 See `docs/retrieval_experiments.md` for the running experiment log.
 
+## Current BGE-M3 + Reranker Snapshot
+
+Run date: 2026-06-03
+
+Dense model: `BAAI/bge-m3`
+
+Reranker: `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`
+
+Parameters: `top_k=5`, `candidate_k=20`, reranker `max_length=512`, reranker `batch_size=4`.
+
+| Retriever | Answerable Questions | Source Recall@5 | Source Hit@5 | Source MRR | Citation-Labeled Questions | Citation Recall@5 | Citation Hit@5 | Citation MRR |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| BM25 | 32 | 0.641 | 0.938 | 0.769 | 12 | 0.083 | 0.083 | 0.017 |
+| Dense Qdrant | 32 | 0.531 | 0.781 | 0.677 | 12 | 0.194 | 0.333 | 0.225 |
+| Hybrid RRF | 32 | 0.568 | 0.812 | 0.683 | 12 | 0.125 | 0.167 | 0.125 |
+| Hybrid RRF + rerank | 32 | 0.635 | 0.906 | 0.731 | 12 | 0.236 | 0.417 | 0.190 |
+
+The reranker improves citation recall and hit rate versus dense retrieval and hybrid RRF, but dense retrieval still has better citation MRR. That means reranking finds exact citations more often, while dense retrieval sometimes places its first exact citation earlier.
+
 ## What This Tells Us
 
 The strongest current gaps are:
@@ -97,7 +135,7 @@ The strongest current gaps are:
 ## Next Improvements
 
 1. Expand exact citation labels from 12 to all answerable questions.
-2. Compare stronger embedding models such as `BAAI/bge-m3` when Wi-Fi is available.
-3. Tune hybrid retrieval with larger candidate windows and source diversity.
-4. Add a cross-encoder reranker after hybrid retrieval.
+2. Tune hybrid retrieval with source diversity and different fusion weights.
+3. Try `BAAI/bge-reranker-v2-m3` as a stronger reranker.
+4. Improve legal chunking with article-aware splits.
 5. Add confidence thresholds and answer-level refusal evaluation.

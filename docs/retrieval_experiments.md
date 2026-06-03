@@ -25,6 +25,8 @@ This log records retrieval experiments in a compact format so later portfolio re
 | E008 | 2026-06-03 | BM25 | local lexical index | full set, top_k=20, candidate_k=100 | 0.755 | 0.969 | 0.771 | 0.194 | 0.333 | 0.038 | Wider top K improves source recall, but exact citations remain low and often rank late. |
 | E009 | 2026-06-03 | Dense Qdrant | `BAAI/bge-m3`, `.qdrant/bge-m3` | full set, top_k=20, candidate_k=100 | 0.599 | 0.875 | 0.684 | 0.236 | 0.417 | 0.237 | BGE-M3 finds more exact citations at top 20, so reranking has useful dense candidates to work with. |
 | E010 | 2026-06-03 | Hybrid RRF | BM25 + BGE-M3 dense | full set, top_k=20, candidate_k=100, RRF k=60 | 0.604 | 0.844 | 0.677 | 0.278 | 0.500 | 0.176 | Hybrid has the best top-20 citation hit rate, suggesting fusion helps recall but not ranking quality yet. |
+| E011 | 2026-06-03 | Hybrid RRF + cross-encoder rerank | BM25 + BGE-M3 dense + `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | full set, top_k=5, candidate_k=50, reranker max_length=512, batch_size=4 | 0.589 | 0.844 | 0.695 | 0.194 | 0.250 | 0.142 | Reranking improves over RRF at candidate_k=50, but the wider candidate pool adds enough noisy chunks that exact citation metrics do not beat dense BGE-M3. |
+| E012 | 2026-06-03 | Hybrid RRF + cross-encoder rerank | BM25 + BGE-M3 dense + `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | full set, top_k=5, candidate_k=20, reranker max_length=512, batch_size=4 | 0.635 | 0.906 | 0.731 | 0.236 | 0.417 | 0.190 | Best citation hit rate so far. Candidate_k=20 works better than 50 for this reranker, showing that larger candidate pools can hurt when the reranker is not strong enough to handle extra noise. |
 
 ## Current Interpretation
 
@@ -33,15 +35,18 @@ This log records retrieval experiments in a compact format so later portfolio re
 - BM25 still has the best source-level retrieval at top 5 and top 20.
 - BGE-M3 improves exact citation retrieval, especially compared with MiniLM.
 - Hybrid retrieval is not automatically better; simple RRF improves top-20 citation hit rate but does not rank exact citations high enough at top 5.
+- Cross-encoder reranking is useful when the candidate pool is controlled. With candidate_k=20 it improves citation recall and hit rate, but with candidate_k=50 it receives too many noisy candidates.
 - Citation-level metrics expose the real bottleneck: finding and ranking the exact supporting chunk, not merely the right document.
+- Hugging Face downloads can hang at 0 bytes when the Xet transfer path is used. Set `HF_HUB_DISABLE_XET=1` before model downloads if that happens.
 
 ## Planned Experiments
 
 | ID | Experiment | Why it matters | Expected signal |
 | --- | --- | --- | --- |
 | P001 | Evaluate top_k=10 and top_k=20 | Checks whether correct citations are nearby but not in the first five results. | Completed for BGE-M3; citation hit improves at top 20, so reranking is likely valuable. |
-| P002 | Increase dense/hybrid candidate_k to 50 or 100 | Gives fusion/reranking a larger candidate pool. | Higher source/citation recall before reranking. |
+| P002 | Increase dense/hybrid candidate_k to 50 or 100 | Gives fusion/reranking a larger candidate pool. | Candidate_k=50 hurt top-5 reranking with the MiniLM cross-encoder; tune this rather than assuming bigger is better. |
 | P003 | Add source diversity after retrieval | Prevents top results from being dominated by one long source. | Better multi-source recall for GDPR + AI Act questions. |
 | P004 | Try `BAAI/bge-m3` | Stronger multilingual retrieval model, especially for cross-lingual and German queries. | Completed; dense source recall and citation recall improved over MiniLM. |
-| P005 | Add cross-encoder reranking | Reorders candidates using query-chunk relevance instead of independent vector similarity. | Citation MRR and Citation Recall@5 should improve if correct chunks appear in top 20/50. |
+| P005 | Add cross-encoder reranking | Reorders candidates using query-chunk relevance instead of independent vector similarity. | Completed with multilingual MiniLM reranker; candidate_k=20 produced the best citation hit rate so far. |
 | P006 | Improve legal chunking | Article/annex-aware chunks reduce evidence dilution and boundary misses. | Better exact citation retrieval and cleaner citations. |
+| P007 | Try `BAAI/bge-reranker-v2-m3` | Stronger multilingual reranker from the same BGE family as the dense model. | Expected to improve citation MRR if download/runtime are acceptable. |

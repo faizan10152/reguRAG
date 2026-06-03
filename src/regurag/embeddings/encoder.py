@@ -80,4 +80,3 @@ class SentenceTransformerEmbedder:
             show_progress_bar=False,
         )
         return embedding.tolist()
-

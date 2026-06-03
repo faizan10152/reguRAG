@@ -20,4 +20,3 @@ def test_reciprocal_rank_fusion_promotes_results_seen_by_multiple_retrievers() -
 
     assert fused[0].chunk == shared
     assert fused[0].retriever == "rrf"
-

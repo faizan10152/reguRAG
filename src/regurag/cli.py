@@ -19,6 +19,11 @@ from regurag.ingestion.chunking import chunk_text
 from regurag.ingestion.download import download_sources
 from regurag.ingestion.manifest import load_source_manifest
 from regurag.ingestion.text_extract import extract_text_from_path
+from regurag.reranking.cross_encoder import (
+    DEFAULT_RERANKER_MODEL,
+    CrossEncoderReranker,
+    CrossEncoderRerankerConfig,
+)
 from regurag.retrieval.bm25 import SimpleBM25Retriever
 from regurag.retrieval.dense_qdrant import (
     DEFAULT_COLLECTION,
@@ -30,7 +35,7 @@ from regurag.sample_data import sample_chunks
 from regurag.schemas import Chunk, RetrievalResult
 from regurag.storage.jsonl import read_chunks_jsonl, write_chunks_jsonl
 
-EVAL_RETRIEVERS = {"bm25", "dense", "hybrid"}
+EVAL_RETRIEVERS = {"bm25", "dense", "hybrid", "hybrid-rerank"}
 
 
 def _find_raw_source(raw_dir: Path, source_id: str) -> Path | None:
@@ -133,7 +138,9 @@ def _dense_index(args: argparse.Namespace) -> None:
 
     vector_size = len(vectors[0])
     retriever.recreate_collection(vector_size=vector_size)
-    indexed = retriever.upsert_chunks(chunks=chunks, vectors=vectors, batch_size=args.upsert_batch_size)
+    indexed = retriever.upsert_chunks(
+        chunks=chunks, vectors=vectors, batch_size=args.upsert_batch_size
+    )
 
     print(f"collection={args.collection}")
     print(f"vector_size={vector_size}")
@@ -217,11 +224,14 @@ def _build_eval_retriever_runs(
         nonlocal bm25_retriever, bm25_search
         if bm25_search is None:
             bm25_retriever = SimpleBM25Retriever(chunks)
-            bm25_search = _cached_search(lambda query: bm25_retriever.search(query, top_k=candidate_k))
+            bm25_search = _cached_search(
+                lambda query: bm25_retriever.search(query, top_k=candidate_k)
+            )
         return bm25_search
 
     dense_search: Callable[[str], list[RetrievalResult]] | None = None
-    if "dense" in selected or "hybrid" in selected:
+    needs_dense = any(retriever in selected for retriever in {"dense", "hybrid", "hybrid-rerank"})
+    if needs_dense:
         embedder = _build_embedder(args)
         dense_retriever = QdrantDenseRetriever(
             url=args.qdrant_url,
@@ -236,6 +246,22 @@ def _build_eval_retriever_runs(
             )
         )
 
+    hybrid_search: Callable[[str], list[RetrievalResult]] | None = None
+
+    def get_hybrid_search() -> Callable[[str], list[RetrievalResult]]:
+        nonlocal hybrid_search
+        if dense_search is None:
+            raise SystemExit("Hybrid retrieval needs dense retrieval.")
+        if hybrid_search is None:
+            bm25 = get_bm25_search()
+            hybrid_search = _cached_search(
+                lambda query, bm25_search=bm25, dense_search=dense_search: reciprocal_rank_fusion(
+                    [bm25_search(query), dense_search(query)],
+                    top_k=candidate_k,
+                )
+            )
+        return hybrid_search
+
     for retriever in selected:
         if retriever == "bm25":
             runs["bm25"] = get_bm25_search()
@@ -244,12 +270,21 @@ def _build_eval_retriever_runs(
                 raise SystemExit("Dense retrieval could not be initialized.")
             runs["dense_qdrant"] = dense_search
         elif retriever == "hybrid":
-            if dense_search is None:
-                raise SystemExit("Hybrid retrieval needs dense retrieval.")
-            bm25 = get_bm25_search()
-            runs["hybrid_rrf"] = _cached_search(
-                lambda query, bm25_search=bm25, dense_search=dense_search: reciprocal_rank_fusion(
-                    [bm25_search(query), dense_search(query)],
+            runs["hybrid_rrf"] = get_hybrid_search()
+        elif retriever == "hybrid-rerank":
+            reranker = CrossEncoderReranker(
+                CrossEncoderRerankerConfig(
+                    model_name=args.reranker_model,
+                    batch_size=args.reranker_batch_size,
+                    max_length=args.reranker_max_length,
+                    retriever_name="hybrid_rerank",
+                )
+            )
+            hybrid = get_hybrid_search()
+            runs["hybrid_rerank"] = _cached_search(
+                lambda query, hybrid_search=hybrid, reranker=reranker: reranker.rerank(
+                    query,
+                    hybrid_search(query),
                     top_k=candidate_k,
                 )
             )
@@ -384,7 +419,7 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument(
         "--retrievers",
         default="bm25",
-        help="Comma-separated retrievers to evaluate: bm25,dense,hybrid.",
+        help="Comma-separated retrievers to evaluate: bm25,dense,hybrid,hybrid-rerank.",
     )
     eval_retrieval.add_argument("--top-k", type=int, default=5)
     eval_retrieval.add_argument("--candidate-k", type=int, default=20)
@@ -394,6 +429,9 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument("--collection", default=DEFAULT_COLLECTION)
     eval_retrieval.add_argument("--model", default=DEFAULT_EMBEDDING_MODEL)
     eval_retrieval.add_argument("--batch-size", type=int, default=16)
+    eval_retrieval.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
+    eval_retrieval.add_argument("--reranker-batch-size", type=int, default=4)
+    eval_retrieval.add_argument("--reranker-max-length", type=int, default=512)
     eval_retrieval.add_argument("--query-prefix", default="")
     eval_retrieval.add_argument("--document-prefix", default="")
     eval_retrieval.add_argument("--output-json", default=None)

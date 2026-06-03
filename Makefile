@@ -1,4 +1,4 @@
-.PHONY: install test lint pre-commit-install api docker-up qdrant-up download chunk search dense-index dense-search compare eval-retrieval eval-retrieval-local
+.PHONY: install test lint pre-commit-install api docker-up qdrant-up download chunk search dense-index dense-search compare eval-retrieval eval-retrieval-local eval-rerank-local
 
 install:
 	uv venv --python 3.11
@@ -45,3 +45,6 @@ eval-retrieval:
 
 eval-retrieval-local:
 	uv run --extra rag regurag eval-retrieval --chunks data/processed/chunks.jsonl --questions data/eval/golden_questions_v1.jsonl --retrievers bm25,dense,hybrid --qdrant-path .qdrant/local --output-md reports/retrieval_eval_latest.md --output-json reports/retrieval_eval_latest.json
+
+eval-rerank-local:
+	HF_HUB_DISABLE_XET=1 uv run --extra rag regurag eval-retrieval --chunks data/processed/chunks.jsonl --questions data/eval/golden_questions_v1.jsonl --retrievers bm25,dense,hybrid,hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20 --reranker-batch-size 4 --output-md reports/retrieval_eval_rerank_latest.md --output-json reports/retrieval_eval_rerank_latest.json

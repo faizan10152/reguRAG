@@ -22,4 +22,3 @@ def test_point_id_for_chunk_is_stable_uuid() -> None:
 
     assert point_id_for_chunk(chunk) == point_id_for_chunk(chunk)
     assert len(point_id_for_chunk(chunk)) == 36
-

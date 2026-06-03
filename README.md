@@ -143,6 +143,12 @@ uv run --extra rag regurag eval-retrieval \
   --output-json reports/retrieval_eval_latest.json
 ```
 
+Hybrid reranking evaluation with the BGE-M3 index:
+
+```bash
+make eval-rerank-local
+```
+
 See [docs/retrieval_evaluation.md](docs/retrieval_evaluation.md) for metric definitions and the current baseline snapshot.
 See [docs/retrieval_experiments.md](docs/retrieval_experiments.md) for the running experiment log.
 

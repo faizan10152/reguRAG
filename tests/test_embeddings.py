@@ -9,4 +9,3 @@ def test_with_prefix_only_changes_text_when_prefix_exists() -> None:
 def test_l2_normalize() -> None:
     assert l2_normalize([3.0, 4.0]) == [0.6, 0.8]
     assert l2_normalize([0.0, 0.0]) == [0.0, 0.0]
-
