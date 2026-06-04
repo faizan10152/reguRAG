@@ -3,6 +3,7 @@ import json
 import pytest
 
 from regurag.generation.answer import generate_grounded_answer, parse_grounded_answer
+from regurag.generation.litellm_client import LiteLLMClient
 from regurag.generation.prompts import build_answer_messages, format_evidence_context
 from regurag.grounding.citations import validate_citation_labels
 from regurag.schemas import Chunk, RetrievalResult
@@ -158,3 +159,28 @@ def test_validate_citation_labels_accepts_structured_citations() -> None:
     validation = validate_citation_labels({"eu_ai_act_en:aaaabbbbccccdddd"}, [_result()])
 
     assert validation.is_supported
+
+
+def test_litellm_client_builds_ollama_kwargs() -> None:
+    client = LiteLLMClient(
+        model="ollama/qwen3:14b",
+        temperature=0.1,
+        max_tokens=256,
+        api_base="http://localhost:11434",
+    )
+
+    kwargs = client.completion_kwargs([{"role": "user", "content": "test"}])
+
+    assert kwargs["model"] == "ollama/qwen3:14b"
+    assert kwargs["api_base"] == "http://localhost:11434"
+    assert kwargs["temperature"] == 0.1
+    assert kwargs["max_tokens"] == 256
+    assert kwargs["response_format"] == {"type": "json_object"}
+
+
+def test_litellm_client_can_disable_json_mode() -> None:
+    client = LiteLLMClient(model="ollama/qwen3:8b", json_mode=False)
+
+    kwargs = client.completion_kwargs([{"role": "user", "content": "test"}])
+
+    assert "response_format" not in kwargs

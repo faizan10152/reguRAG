@@ -60,6 +60,56 @@ REGURAG_LLM_MODEL="<provider>/<model>" make answer-local \
   q="Is AI CV screening high-risk under the AI Act?"
 ```
 
+## Local Ollama Run
+
+Install Ollama first, then pull a Qwen model:
+
+```bash
+make ollama-pull-8b
+```
+
+For a stronger local model, try:
+
+```bash
+make ollama-pull-14b
+```
+
+Start with BM25-only retrieval to isolate model behavior:
+
+```bash
+make answer-ollama-local q="Is AI CV screening high-risk under the AI Act?"
+```
+
+Use the full reranked retrieval path when evaluating the portfolio system:
+
+```bash
+make answer-ollama-rerank q="Is AI CV screening high-risk under the AI Act?"
+```
+
+By default, these targets use:
+
+```text
+OLLAMA_MODEL=ollama/qwen3:8b
+OLLAMA_API_BASE=http://localhost:11434
+```
+
+Override the model like this:
+
+```bash
+make answer-ollama-rerank OLLAMA_MODEL=ollama/qwen3:14b \
+  q="Is AI CV screening high-risk under the AI Act?"
+```
+
+Ollama runs locally, but ReguRAG still calls it through LiteLLM. The model name uses the LiteLLM provider prefix `ollama/`, while the API base points to the local Ollama server.
+
+If Ollama rejects explicit JSON mode, run the direct command with:
+
+```bash
+--disable-json-mode
+```
+
+The prompt still requests strict JSON, but the server will not receive a JSON-mode parameter.
+
 Equivalent direct command:
 
 ```bash
@@ -73,6 +123,19 @@ HF_HUB_DISABLE_XET=1 uv run --extra rag regurag answer \
   --top-k 5 \
   --candidate-k 20 \
   --llm-model "<provider>/<model>"
+```
+
+For OpenAI-compatible local or hosted endpoints, pass:
+
+```bash
+--llm-api-base "http://localhost:11434"
+```
+
+For hosted APIs that need a key, prefer the environment variable:
+
+```bash
+REGURAG_LLM_API_KEY="..." REGURAG_LLM_API_BASE="..." REGURAG_LLM_MODEL="..." make answer-local \
+  q="Is AI CV screening high-risk under the AI Act?"
 ```
 
 If a provider does not support JSON mode, add:

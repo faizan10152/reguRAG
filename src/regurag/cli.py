@@ -42,6 +42,8 @@ from regurag.storage.jsonl import read_chunks_jsonl, write_chunks_jsonl
 
 EVAL_RETRIEVERS = {"bm25", "dense", "hybrid", "hybrid-rerank"}
 LLM_MODEL_ENV = "REGURAG_LLM_MODEL"
+LLM_API_BASE_ENV = "REGURAG_LLM_API_BASE"
+LLM_API_KEY_ENV = "REGURAG_LLM_API_KEY"
 
 
 def _find_raw_source(raw_dir: Path, source_id: str) -> Path | None:
@@ -392,6 +394,8 @@ def _answer(args: argparse.Namespace) -> None:
         temperature=args.temperature,
         max_tokens=args.max_tokens,
         json_mode=not args.disable_json_mode,
+        api_base=args.llm_api_base or os.getenv(LLM_API_BASE_ENV),
+        api_key=args.llm_api_key or os.getenv(LLM_API_KEY_ENV),
     )
     answer_result = generate_grounded_answer(
         question=args.query,
@@ -400,12 +404,19 @@ def _answer(args: argparse.Namespace) -> None:
         max_chars_per_chunk=args.max_context_chars,
         min_citations=args.min_citations,
     )
-    _print_answer_result(answer_result, retriever_name=retriever_name, llm_model=llm_model)
+    llm_api_base = args.llm_api_base or os.getenv(LLM_API_BASE_ENV)
+    _print_answer_result(
+        answer_result,
+        retriever_name=retriever_name,
+        llm_model=llm_model,
+        llm_api_base=llm_api_base,
+    )
 
     if args.output_json:
         payload = answer_result.to_dict()
         payload["retriever"] = retriever_name
         payload["llm_model"] = llm_model
+        payload["llm_api_base"] = llm_api_base
         Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output_json).write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
@@ -419,9 +430,12 @@ def _print_answer_result(
     *,
     retriever_name: str,
     llm_model: str,
+    llm_api_base: str | None = None,
 ) -> None:
     print(f"retriever={retriever_name}")
     print(f"llm_model={llm_model}")
+    if llm_api_base:
+        print(f"llm_api_base={llm_api_base}")
     print(f"supported={result.supported}")
     print(f"guardrail_triggered={result.guardrail_triggered}")
     print(f"confidence={result.answer.confidence}")
@@ -591,6 +605,8 @@ def build_parser() -> argparse.ArgumentParser:
     answer.add_argument("--query-prefix", default="")
     answer.add_argument("--document-prefix", default="")
     answer.add_argument("--llm-model", default=None)
+    answer.add_argument("--llm-api-base", default=None)
+    answer.add_argument("--llm-api-key", default=None)
     answer.add_argument("--temperature", type=float, default=0.0)
     answer.add_argument("--max-tokens", type=int, default=900)
     answer.add_argument("--max-context-chars", type=int, default=1500)

@@ -1,4 +1,7 @@
-.PHONY: install test lint pre-commit-install api docker-up qdrant-up download chunk search dense-index dense-search compare eval-retrieval eval-retrieval-local eval-rerank-local answer-dry-run answer-local
+OLLAMA_MODEL ?= ollama/qwen3:8b
+OLLAMA_API_BASE ?= http://localhost:11434
+
+.PHONY: install test lint pre-commit-install api docker-up qdrant-up download chunk search dense-index dense-search compare eval-retrieval eval-retrieval-local eval-rerank-local answer-dry-run answer-local ollama-pull-8b ollama-pull-14b answer-ollama-local answer-ollama-rerank
 
 install:
 	uv venv --python 3.11
@@ -54,3 +57,15 @@ answer-dry-run:
 
 answer-local:
 	HF_HUB_DISABLE_XET=1 uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20
+
+ollama-pull-8b:
+	ollama pull qwen3:8b
+
+ollama-pull-14b:
+	ollama pull qwen3:14b
+
+answer-ollama-local:
+	uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever bm25 --top-k 5 --llm-model "$(OLLAMA_MODEL)" --llm-api-base "$(OLLAMA_API_BASE)"
+
+answer-ollama-rerank:
+	HF_HUB_DISABLE_XET=1 uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20 --llm-model "$(OLLAMA_MODEL)" --llm-api-base "$(OLLAMA_API_BASE)"

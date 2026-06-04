@@ -162,6 +162,13 @@ REGURAG_LLM_MODEL="<provider>/<model>" make answer-local \
   q="Is AI CV screening high-risk under the AI Act?"
 ```
 
+Run grounded answer generation locally with Ollama:
+
+```bash
+make ollama-pull-8b
+make answer-ollama-local q="Is AI CV screening high-risk under the AI Act?"
+```
+
 See [docs/retrieval_evaluation.md](docs/retrieval_evaluation.md) for metric definitions and the current baseline snapshot.
 See [docs/retrieval_experiments.md](docs/retrieval_experiments.md) for the running experiment log.
 See [docs/answer_generation.md](docs/answer_generation.md) for the structured answer and citation-validation workflow.
