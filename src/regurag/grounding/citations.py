@@ -17,6 +17,14 @@ def validate_citations(
     retrieved_results: Iterable[RetrievalResult],
 ) -> CitationValidation:
     cited = extract_citation_labels(answer_text)
+    return validate_citation_labels(cited, retrieved_results)
+
+
+def validate_citation_labels(
+    cited_labels: Iterable[str],
+    retrieved_results: Iterable[RetrievalResult],
+) -> CitationValidation:
+    cited = set(cited_labels)
     available = {result.citation_label for result in retrieved_results}
     missing = cited - available
     return CitationValidation(cited_labels=cited, available_labels=available, missing_labels=missing)

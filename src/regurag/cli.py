@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -15,6 +17,9 @@ from regurag.evaluation.runner import (
     write_json_report,
     write_markdown_report,
 )
+from regurag.generation.answer import AnswerGenerationResult, generate_grounded_answer
+from regurag.generation.litellm_client import LiteLLMClient
+from regurag.generation.prompts import build_answer_messages
 from regurag.ingestion.chunking import chunk_text
 from regurag.ingestion.download import download_sources
 from regurag.ingestion.manifest import load_source_manifest
@@ -36,6 +41,7 @@ from regurag.schemas import Chunk, RetrievalResult
 from regurag.storage.jsonl import read_chunks_jsonl, write_chunks_jsonl
 
 EVAL_RETRIEVERS = {"bm25", "dense", "hybrid", "hybrid-rerank"}
+LLM_MODEL_ENV = "REGURAG_LLM_MODEL"
 
 
 def _find_raw_source(raw_dir: Path, source_id: str) -> Path | None:
@@ -335,6 +341,127 @@ def _eval_retrieval(args: argparse.Namespace) -> None:
         print(f"wrote Markdown report to {args.output_md}")
 
 
+def _build_single_retriever_run(
+    args: argparse.Namespace,
+    chunks: list[Chunk],
+) -> tuple[str, Callable[[str], list[RetrievalResult]]]:
+    retrieval_args = argparse.Namespace(**vars(args), retrievers=args.retriever)
+    runs = _build_eval_retriever_runs(retrieval_args, chunks)
+    if len(runs) != 1:
+        raise SystemExit(f"Expected one retriever run, got {len(runs)}.")
+    return next(iter(runs.items()))
+
+
+def _answer(args: argparse.Namespace) -> None:
+    chunks = read_chunks_jsonl(args.chunks)
+    if not chunks:
+        raise SystemExit(f"No chunks found at {args.chunks}. Run the chunk command first.")
+
+    retriever_name, search = _build_single_retriever_run(args, chunks)
+    results = search(args.query)[: args.top_k]
+
+    if args.dry_run_prompt:
+        messages = build_answer_messages(
+            args.query,
+            results,
+            max_chars_per_chunk=args.max_context_chars,
+        )
+        print(
+            json.dumps(
+                {
+                    "question": args.query,
+                    "retriever": retriever_name,
+                    "messages": messages,
+                    "retrieved_results": _retrieval_results_payload(results),
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        return
+
+    llm_model = args.llm_model or os.getenv(LLM_MODEL_ENV)
+    if not llm_model:
+        raise SystemExit(
+            f"Set --llm-model or {LLM_MODEL_ENV} before running answer generation. "
+            "Use --dry-run-prompt to inspect retrieval and prompting without an LLM call."
+        )
+
+    llm = LiteLLMClient(
+        model=llm_model,
+        temperature=args.temperature,
+        max_tokens=args.max_tokens,
+        json_mode=not args.disable_json_mode,
+    )
+    answer_result = generate_grounded_answer(
+        question=args.query,
+        retrieved_results=results,
+        llm=llm,
+        max_chars_per_chunk=args.max_context_chars,
+        min_citations=args.min_citations,
+    )
+    _print_answer_result(answer_result, retriever_name=retriever_name, llm_model=llm_model)
+
+    if args.output_json:
+        payload = answer_result.to_dict()
+        payload["retriever"] = retriever_name
+        payload["llm_model"] = llm_model
+        Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.output_json).write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"wrote JSON answer report to {args.output_json}")
+
+
+def _print_answer_result(
+    result: AnswerGenerationResult,
+    *,
+    retriever_name: str,
+    llm_model: str,
+) -> None:
+    print(f"retriever={retriever_name}")
+    print(f"llm_model={llm_model}")
+    print(f"supported={result.supported}")
+    print(f"guardrail_triggered={result.guardrail_triggered}")
+    print(f"confidence={result.answer.confidence}")
+    if result.answer.refusal_reason:
+        print(f"refusal_reason={result.answer.refusal_reason}")
+    print("\nAnswer:")
+    print(result.answer.answer)
+    print("\nCitations:")
+    for label in result.answer.citations:
+        print(f"- [{label}]")
+    if result.citation_validation.missing_labels:
+        print("\nMissing citations:")
+        for label in sorted(result.citation_validation.missing_labels):
+            print(f"- [{label}]")
+    print("\nRetrieved evidence:")
+    for item in _retrieval_results_payload(result.retrieved_results):
+        print(
+            f"- #{item['rank']} [{item['citation_label']}] "
+            f"{item['title']} | {item['section_heading'] or 'no section'}"
+        )
+
+
+def _retrieval_results_payload(results: list[RetrievalResult]) -> list[dict[str, object]]:
+    return [
+        {
+            "rank": result.rank,
+            "score": result.score,
+            "retriever": result.retriever,
+            "citation_label": result.citation_label,
+            "source_id": result.chunk.source_id,
+            "chunk_id": result.chunk.chunk_id,
+            "title": result.chunk.metadata.get("title", result.chunk.source_id),
+            "section_heading": result.chunk.metadata.get("section_heading"),
+            "url": result.chunk.metadata.get("url"),
+            "snippet": result.chunk.text[:500],
+        }
+        for result in results
+    ]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="regurag",
@@ -437,6 +564,41 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument("--output-json", default=None)
     eval_retrieval.add_argument("--output-md", default=None)
     eval_retrieval.set_defaults(func=_eval_retrieval)
+
+    answer = subparsers.add_parser(
+        "answer",
+        help="Generate a grounded answer with retrieved citations.",
+    )
+    answer.add_argument("--chunks", required=True)
+    answer.add_argument("--query", required=True)
+    answer.add_argument(
+        "--retriever",
+        choices=sorted(EVAL_RETRIEVERS),
+        default="hybrid-rerank",
+        help="Retrieval pipeline to use before answer generation.",
+    )
+    answer.add_argument("--top-k", type=int, default=5)
+    answer.add_argument("--candidate-k", type=int, default=20)
+    answer.add_argument("--qdrant-url", default=DEFAULT_QDRANT_URL)
+    answer.add_argument("--qdrant-location", default=None)
+    answer.add_argument("--qdrant-path", default=None)
+    answer.add_argument("--collection", default=DEFAULT_COLLECTION)
+    answer.add_argument("--model", default=DEFAULT_EMBEDDING_MODEL)
+    answer.add_argument("--batch-size", type=int, default=16)
+    answer.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
+    answer.add_argument("--reranker-batch-size", type=int, default=4)
+    answer.add_argument("--reranker-max-length", type=int, default=512)
+    answer.add_argument("--query-prefix", default="")
+    answer.add_argument("--document-prefix", default="")
+    answer.add_argument("--llm-model", default=None)
+    answer.add_argument("--temperature", type=float, default=0.0)
+    answer.add_argument("--max-tokens", type=int, default=900)
+    answer.add_argument("--max-context-chars", type=int, default=1500)
+    answer.add_argument("--min-citations", type=int, default=1)
+    answer.add_argument("--disable-json-mode", action="store_true")
+    answer.add_argument("--dry-run-prompt", action="store_true")
+    answer.add_argument("--output-json", default=None)
+    answer.set_defaults(func=_answer)
 
     return parser
 

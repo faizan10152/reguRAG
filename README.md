@@ -149,8 +149,22 @@ Hybrid reranking evaluation with the BGE-M3 index:
 make eval-rerank-local
 ```
 
+Inspect the answer-generation prompt without API calls:
+
+```bash
+make answer-dry-run q="Is AI CV screening high-risk under the AI Act?"
+```
+
+Run grounded answer generation through LiteLLM:
+
+```bash
+REGURAG_LLM_MODEL="<provider>/<model>" make answer-local \
+  q="Is AI CV screening high-risk under the AI Act?"
+```
+
 See [docs/retrieval_evaluation.md](docs/retrieval_evaluation.md) for metric definitions and the current baseline snapshot.
 See [docs/retrieval_experiments.md](docs/retrieval_experiments.md) for the running experiment log.
+See [docs/answer_generation.md](docs/answer_generation.md) for the structured answer and citation-validation workflow.
 
 ## Why BM25 First?
 
@@ -166,16 +180,14 @@ Dense vector search is better at semantic similarity, but it can miss exact term
 
 ## Next Milestones
 
-1. Tune dense retrieval and hybrid fusion using the golden set.
-2. Add cross-encoder reranking.
-3. Add LLM answer generation through LiteLLM.
-4. Enforce structured answer JSON with citations.
-5. Build a 100-question golden evaluation set with exact citation labels.
-6. Add Ragas and custom citation metrics.
-7. Add Langfuse tracing.
-8. Build a simple bilingual UI.
-9. Record a 3-minute demo and publish a project page.
+1. Add answer-level evaluation for faithfulness and refusal accuracy.
+2. Expand exact citation labels from 12 to all answerable questions.
+3. Improve legal chunking with article-aware splits.
+4. Try a stronger reranker such as `BAAI/bge-reranker-v2-m3`.
+5. Add Langfuse tracing.
+6. Build a simple bilingual UI.
+7. Record a 3-minute demo and publish a project page.
 
 ## Portfolio Pitch
 
-Built a bilingual production-style RAG assistant for AI Act/GDPR compliance in German regulated industries, with source-aware ingestion, BM25 baseline retrieval, planned hybrid dense retrieval, reranking, citation validation, refusal handling, evaluation metrics, CI, and Dockerized deployment.
+Built a bilingual production-style RAG assistant for AI Act/GDPR compliance in German regulated industries, with source-aware ingestion, BM25 and dense retrieval, hybrid fusion, reranking, structured LLM answer generation, citation validation, refusal handling, evaluation metrics, CI, and Dockerized deployment.

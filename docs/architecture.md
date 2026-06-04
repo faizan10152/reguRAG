@@ -53,31 +53,56 @@ Current MVP:
 - BM25 lexical retrieval.
 - Qdrant-backed dense retrieval.
 - Reciprocal rank fusion utility.
-- Source-level retrieval evaluation for BM25, dense, and hybrid runs.
-
-Planned:
-
-- Hybrid retrieval endpoint.
 - Cross-encoder reranking.
+- Source-level and citation-level retrieval evaluation for BM25, dense, hybrid, and reranked runs.
 
 Do not skip the baseline. Without a baseline, you cannot prove that embeddings improved the system.
 
 ### Grounding
 
-The answer generator will eventually output structured JSON:
+The answer generator outputs structured JSON:
 
 ```json
 {
-  "answer": "...",
-  "claims": [],
+  "answer": "short grounded answer with inline citations, or a refusal",
   "citations": [],
-  "confidence": "medium",
+  "confidence": "low|medium|high",
   "unsupported_claims": [],
+  "should_refuse": false,
   "refusal_reason": null
 }
 ```
 
-The citation validator should reject answers that cite chunks not retrieved for the question.
+The current guarded generation path:
+
+```text
+retrieve evidence
+  -> build prompt with exact citation labels
+  -> call LiteLLM
+  -> parse JSON
+  -> validate cited labels against retrieved chunks
+  -> refuse if citations are missing or invalid
+```
+
+The citation validator rejects answers that cite chunks not retrieved for the question.
+
+### Answer Result
+
+The answer command reports:
+
+```json
+{
+  "supported": true,
+  "guardrail_triggered": false,
+  "confidence": "medium",
+  "citation_validation": {
+    "cited_labels": [],
+    "available_labels": [],
+    "missing_labels": [],
+    "is_supported": true
+  }
+}
+```
 
 ### Evaluation
 

@@ -57,14 +57,14 @@ Deliverable:
 
 ## Day 5: Answer Generation and Citation Enforcement
 
-- Add LiteLLM provider adapter.
-- Force structured JSON answer output.
-- Validate citations against retrieved chunks.
-- Refuse unsupported answers.
+- Added LiteLLM provider adapter.
+- Added structured JSON answer output.
+- Added citation validation against retrieved chunks.
+- Added refusal guardrail for unsupported answers.
 
 Deliverable:
 
-- Demo questions with supported answers and refusal examples.
+- CLI answer command with dry-run prompt inspection and guarded generation.
 
 ## Day 6: Evaluation
 
