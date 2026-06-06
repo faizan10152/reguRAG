@@ -32,7 +32,7 @@ def download_source(source: SourceRecord, raw_dir: str | Path) -> Path:
     request = urllib.request.Request(
         source.url,
         headers={
-            "User-Agent": "ReguRAG research bot; contact: local portfolio project",
+            "User-Agent": "ReguRAG regulatory research crawler; contact: local development",
             "Accept": "text/html,application/pdf,text/plain,*/*",
         },
     )

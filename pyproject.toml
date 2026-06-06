@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "regurag"
 version = "0.1.0"
-description = "Production-style bilingual RAG assistant for AI Act, GDPR, and German regulatory guidance."
+description = "Bilingual regulatory intelligence RAG system for EU AI Act, GDPR, and German AI governance sources."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 license = { text = "MIT" }

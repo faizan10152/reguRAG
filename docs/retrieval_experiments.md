@@ -1,6 +1,6 @@
 # Retrieval Experiments
 
-This log records retrieval experiments in a compact format so later portfolio reports can cite what was tried, what changed, and what we learned.
+This log records retrieval experiments in a compact format so technical reports can cite what was tried, what changed, and what was learned.
 
 ## Benchmark Setup
 

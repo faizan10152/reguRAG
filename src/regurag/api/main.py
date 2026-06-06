@@ -42,7 +42,7 @@ def _load_chunks() -> list:
 app = FastAPI(
     title="ReguRAG",
     version="0.1.0",
-    description="Bilingual production-style RAG assistant for AI Act/GDPR research.",
+    description="Bilingual regulatory intelligence RAG system for AI Act, GDPR, and German AI governance sources.",
 )
 
 

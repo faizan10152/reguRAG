@@ -1,8 +1,8 @@
 # ReguRAG
 
-Production-style bilingual RAG assistant for AI Act, GDPR, and German AI governance research.
+ReguRAG is a bilingual regulatory intelligence RAG system for EU AI Act, GDPR, and German AI governance sources.
 
-The goal is not to build another "chat with PDF" demo. ReguRAG is designed as a portfolio project for junior AI engineer roles in Germany: reproducible ingestion, source-aware chunking, hybrid retrieval, reranking, citation enforcement, refusal behavior, evaluation, observability, and CI quality gates.
+The system is designed around traceable answers from official documents, not generic document chat. It combines reproducible ingestion, source-aware chunking, lexical and dense retrieval, hybrid fusion, reranking, grounded answer generation, citation enforcement, refusal behavior, evaluation, observability, and CI quality gates.
 
 ## Problem Statement
 
@@ -14,20 +14,22 @@ German companies adopting AI in HR, finance, healthcare, and business operations
 - Which official source supports the answer?
 - When should the system refuse because the evidence is not in the corpus?
 
-ReguRAG answers from official EU and German sources and must cite the retrieved evidence. It is decision support, not legal advice.
+ReguRAG retrieves and answers from official EU and German sources, with every answer tied back to retrieved evidence. It is decision support for regulatory research, not legal advice.
 
-## Current MVP
+## Current System
 
-This first version contains the production-shaped foundation:
+The current system contains:
 
-- Standalone repository outside the parent workspace.
 - Source manifest for official EU/German regulatory sources.
 - Reproducible downloader for raw source files.
 - Text extraction and article-aware chunking utilities.
 - Transparent BM25 retrieval baseline.
 - Dense retrieval commands backed by Qdrant and sentence-transformers.
-- Reciprocal rank fusion utility for future hybrid retrieval.
-- Citation extraction and validation helpers.
+- Reciprocal rank fusion for hybrid retrieval.
+- Cross-encoder reranking.
+- Structured LLM answer generation through LiteLLM.
+- Citation extraction and validation.
+- Refusal gate for unsupported answers.
 - Retrieval evaluation over an approved 38-question golden set.
 - Source-level and citation-level retrieval metrics: Recall@K, Precision@K, Hit@K, MRR.
 - FastAPI shell with retrieval-only `/query` endpoint.
@@ -113,7 +115,7 @@ uv run --extra rag regurag dense-search --query "Can we train a model on custome
 uv run --extra rag regurag compare-retrieval --chunks data/processed/chunks.jsonl --query "Can we train a model on customer support tickets?"
 ```
 
-The default embedding model is `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` because it is fast enough for local iteration. For a stronger portfolio run, switch to:
+The default embedding model is `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` because it is fast enough for local iteration. For stronger multilingual retrieval, switch to:
 
 ```bash
 uv run --extra rag regurag dense-index \
@@ -193,8 +195,8 @@ Dense vector search is better at semantic similarity, but it can miss exact term
 4. Try a stronger reranker such as `BAAI/bge-reranker-v2-m3`.
 5. Add Langfuse tracing.
 6. Build a simple bilingual UI.
-7. Record a 3-minute demo and publish a project page.
+7. Add deployment documentation and operational runbooks.
 
-## Portfolio Pitch
+## Technical Summary
 
-Built a bilingual production-style RAG assistant for AI Act/GDPR compliance in German regulated industries, with source-aware ingestion, BM25 and dense retrieval, hybrid fusion, reranking, structured LLM answer generation, citation validation, refusal handling, evaluation metrics, CI, and Dockerized deployment.
+ReguRAG is a production-shaped RAG system for AI Act/GDPR regulatory research in German business contexts. It uses source-aware ingestion, BM25 and dense retrieval, hybrid fusion, reranking, structured LLM answer generation, citation validation, refusal handling, retrieval metrics, CI, and Dockerized deployment.

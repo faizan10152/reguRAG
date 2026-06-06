@@ -80,7 +80,7 @@ Start with BM25-only retrieval to isolate model behavior:
 make answer-ollama-local q="Is AI CV screening high-risk under the AI Act?"
 ```
 
-Use the full reranked retrieval path when evaluating the portfolio system:
+Use the full reranked retrieval path when evaluating the complete system:
 
 ```bash
 make answer-ollama-rerank q="Is AI CV screening high-risk under the AI Act?"

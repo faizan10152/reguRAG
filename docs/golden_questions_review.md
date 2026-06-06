@@ -1,6 +1,6 @@
 # Golden Questions Review
 
-Purpose: review these candidate questions for business realism, difficulty, and relevance to junior AI engineer roles in Germany.
+Purpose: review these candidate questions for business realism, structural difficulty, and relevance to AI governance work in German business contexts.
 
 Status: approved on 2026-05-31. The canonical machine-readable set is now `data/eval/golden_questions_v1.jsonl`.
 

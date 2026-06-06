@@ -13,7 +13,7 @@ def sample_chunks() -> list[Chunk]:
             text=(
                 "Synthetic sample. AI systems used for recruitment, candidate screening, "
                 "or decisions affecting employment can require careful risk assessment "
-                "under the EU AI Act. A production assistant must cite the exact official "
+                "under the EU AI Act. A production system must cite the exact official "
                 "article before giving a compliance answer."
             ),
             metadata={

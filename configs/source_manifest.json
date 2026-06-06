@@ -1,6 +1,6 @@
 {
   "project": "ReguRAG",
-  "description": "Official EU and German sources for a bilingual AI governance RAG assistant.",
+  "description": "Official EU and German sources for bilingual AI governance and data-protection retrieval.",
   "sources": [
     {
       "source_id": "eu_ai_act_en",

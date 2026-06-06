@@ -2,14 +2,14 @@
 
 ## Week 1 Goal
 
-Create a credible version that can go on a CV and GitHub profile:
+Create a credible first version of the regulatory intelligence system:
 
 - local API works
 - ingestion is reproducible
 - retrieval works on official sources
 - citations are visible
 - evaluation plan exists
-- README explains business value
+- README explains the system scope and technical value
 
 ## Day 1: Repo and Foundations
 
@@ -76,17 +76,17 @@ Deliverable:
 
 - `uv run regurag eval ...` produces a report.
 
-## Day 7: Portfolio Packaging
+## Day 7: System Packaging
 
 - Add simple UI.
 - Polish README.
 - Add architecture diagram.
-- Record 3-minute demo.
-- Write CV bullets.
+- Add deployment documentation.
+- Add operational runbook.
 
 Deliverable:
 
-- GitHub repo and demo-ready local app.
+- GitHub repo and reproducible local app.
 
 ## After Week 1
 

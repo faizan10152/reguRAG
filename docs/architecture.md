@@ -4,7 +4,7 @@
 
 The system should make unsupported answers difficult to produce.
 
-That means retrieval, generation, citation validation, and evaluation are separate components. This is more work than a demo, but it makes failure modes easier to inspect.
+That means retrieval, generation, citation validation, and evaluation are separate components. This adds engineering overhead, but it makes failure modes easier to inspect.
 
 ## Components
 
@@ -36,7 +36,7 @@ Why this matters:
 
 Chunking is not just splitting every 650 words. For legal and regulatory text, headings, articles, annexes, and sections are part of the meaning.
 
-Current MVP:
+Current system:
 
 - Detects article/section-like headings.
 - Adds source metadata to every chunk.
@@ -48,7 +48,7 @@ Possible issue:
 
 ### Retrieval
 
-Current MVP:
+Current system:
 
 - BM25 lexical retrieval.
 - Qdrant-backed dense retrieval.

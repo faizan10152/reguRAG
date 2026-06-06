@@ -8,7 +8,7 @@ RAG has three separate jobs:
 2. Generate an answer from that evidence.
 3. Prove the answer is grounded.
 
-Many demos only do step 2. Production systems spend most of their effort on steps 1 and 3.
+Lightweight prototypes often only do step 2. Production systems spend most of their effort on steps 1 and 3.
 
 ## Do
 
@@ -27,7 +27,7 @@ Many demos only do step 2. Production systems spend most of their effort on step
 - Do not claim legal certainty from a RAG answer.
 - Do not use only semantic search for article-number-heavy questions.
 - Do not evaluate only with nice examples.
-- Do not hide failures. Good portfolio projects explain tradeoffs.
+- Do not hide failures. Good technical reports explain tradeoffs.
 
 ## Common Failure Modes
 
@@ -92,7 +92,7 @@ This project uses the `pre-commit` framework with local hooks:
 - Ruff linting
 - pytest
 
-The custom guard blocks common portfolio-repo mistakes:
+The custom guard blocks common repository mistakes:
 
 - committing `.env`
 - committing generated raw/processed data artifacts
