@@ -3,7 +3,7 @@ OLLAMA_API_BASE ?= http://localhost:11434
 HF_LOCAL_ENV ?= HF_HUB_DISABLE_XET=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 ANSWER_EVAL_IDS ?= GQ001,GQ003,GQ004,GQ008,GQ021,GQ029,GQ036,GQ038
 
-.PHONY: install test lint pre-commit-install api docker-up qdrant-up download chunk search dense-index dense-search compare eval-retrieval eval-retrieval-local eval-rerank-local eval-answers-ollama answer-dry-run answer-local ollama-pull-8b ollama-pull-14b answer-ollama-local answer-ollama-rerank
+.PHONY: install test lint pre-commit-install api api-rag frontend-install frontend-dev frontend-build docker-up qdrant-up download chunk search dense-index dense-search compare eval-retrieval eval-retrieval-local eval-rerank-local eval-answers-ollama answer-dry-run answer-local ollama-pull-8b ollama-pull-14b answer-ollama-local answer-ollama-rerank
 
 install:
 	uv venv --python 3.11
@@ -20,6 +20,18 @@ lint:
 
 api:
 	uv run uvicorn regurag.api.main:app --reload --host 0.0.0.0 --port 8000
+
+api-rag:
+	$(HF_LOCAL_ENV) REGURAG_LLM_MODEL="$(OLLAMA_MODEL)" REGURAG_LLM_API_BASE="$(OLLAMA_API_BASE)" uv run --extra api --extra rag uvicorn regurag.api.main:app --reload --host 0.0.0.0 --port 8000
+
+frontend-install:
+	npm install --prefix frontend
+
+frontend-dev:
+	npm run dev --prefix frontend
+
+frontend-build:
+	npm run build --prefix frontend
 
 docker-up:
 	docker compose up --build

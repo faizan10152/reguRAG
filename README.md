@@ -32,6 +32,7 @@ The current system contains:
 - Refusal gate for unsupported answers.
 - Retrieval evaluation over an approved 38-question golden set.
 - Answer-level evaluation for structured output, citation support, refusal behavior, and latency.
+- React workbench for grounded answers, citation inspection, retrieved evidence, and evaluation snapshot.
 - Source-level and citation-level retrieval metrics: Recall@K, Precision@K, Hit@K, MRR.
 - FastAPI shell with retrieval-only `/query` endpoint.
 - Docker Compose with API and Qdrant.
@@ -170,6 +171,20 @@ Run grounded answer generation locally with Ollama:
 ```bash
 make ollama-pull-8b
 make answer-ollama-local q="Is AI CV screening high-risk under the AI Act?"
+```
+
+Run the local workbench:
+
+```bash
+make api-rag
+make frontend-install
+make frontend-dev
+```
+
+Open:
+
+```text
+http://localhost:5173
 ```
 
 Run the local answer evaluation smoke set:

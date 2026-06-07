@@ -10,7 +10,9 @@ __pycache__/
 htmlcov/
 dist/
 build/
+*.tsbuildinfo
 *.egg-info/
+frontend/node_modules/
 
 # Data artifacts are reproducible from configs/source_manifest.json.
 data/raw/*
