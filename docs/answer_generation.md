@@ -183,4 +183,4 @@ When the guardrail triggers, ReguRAG marks the response as unsupported and refus
 
 ## Current Limitation
 
-Citation validation checks whether cited labels were retrieved. It does not yet prove every sentence is semantically entailed by the cited text. That is the next evaluation layer: answer faithfulness, refusal accuracy, and possibly Ragas-style metrics.
+Citation validation checks whether cited labels were retrieved. It does not yet prove every sentence is semantically entailed by the cited text. The answer evaluator tracks structure, support, citations, refusal behavior, and latency; semantic correctness still needs manual labels or a stronger faithfulness evaluator.

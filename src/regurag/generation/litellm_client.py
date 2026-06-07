@@ -16,6 +16,7 @@ class LiteLLMClient:
     json_mode: bool = True
     api_base: str | None = None
     api_key: str | None = None
+    timeout: float | None = None
 
     def completion_kwargs(self, messages: list[dict[str, str]]) -> dict:
         kwargs = {
@@ -28,6 +29,8 @@ class LiteLLMClient:
             kwargs["api_base"] = self.api_base
         if self.api_key:
             kwargs["api_key"] = self.api_key
+        if self.timeout is not None:
+            kwargs["timeout"] = self.timeout
         if self.json_mode:
             kwargs["response_format"] = {"type": "json_object"}
         return kwargs

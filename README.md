@@ -31,6 +31,7 @@ The current system contains:
 - Citation extraction and validation.
 - Refusal gate for unsupported answers.
 - Retrieval evaluation over an approved 38-question golden set.
+- Answer-level evaluation for structured output, citation support, refusal behavior, and latency.
 - Source-level and citation-level retrieval metrics: Recall@K, Precision@K, Hit@K, MRR.
 - FastAPI shell with retrieval-only `/query` endpoint.
 - Docker Compose with API and Qdrant.
@@ -171,9 +172,16 @@ make ollama-pull-8b
 make answer-ollama-local q="Is AI CV screening high-risk under the AI Act?"
 ```
 
+Run the local answer evaluation smoke set:
+
+```bash
+make eval-answers-ollama
+```
+
 See [docs/retrieval_evaluation.md](docs/retrieval_evaluation.md) for metric definitions and the current baseline snapshot.
 See [docs/retrieval_experiments.md](docs/retrieval_experiments.md) for the running experiment log.
 See [docs/answer_generation.md](docs/answer_generation.md) for the structured answer and citation-validation workflow.
+See [docs/answer_evaluation.md](docs/answer_evaluation.md) for answer-level metrics.
 
 ## Why BM25 First?
 
@@ -189,7 +197,7 @@ Dense vector search is better at semantic similarity, but it can miss exact term
 
 ## Next Milestones
 
-1. Add answer-level evaluation for faithfulness and refusal accuracy.
+1. Manually label answer evaluation rows as correct, partially correct, wrong, or unclear.
 2. Expand exact citation labels from 12 to all answerable questions.
 3. Improve legal chunking with article-aware splits.
 4. Try a stronger reranker such as `BAAI/bge-reranker-v2-m3`.

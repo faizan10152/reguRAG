@@ -11,6 +11,11 @@ from regurag.embeddings.encoder import (
     EmbeddingConfig,
     SentenceTransformerEmbedder,
 )
+from regurag.evaluation.answers import (
+    evaluate_answer_run,
+    write_answer_json_report,
+    write_answer_markdown_report,
+)
 from regurag.evaluation.runner import (
     evaluate_retrieval_runs,
     load_golden_questions,
@@ -371,6 +376,26 @@ def _build_single_retriever_run(
     return next(iter(runs.items()))
 
 
+def _filter_questions(
+    questions: list,
+    *,
+    question_ids: str | None = None,
+    limit: int | None = None,
+) -> list:
+    selected = questions
+    if question_ids:
+        ids = {question_id.strip() for question_id in question_ids.split(",") if question_id.strip()}
+        selected = [question for question in selected if question.question_id in ids]
+        missing = sorted(ids - {question.question_id for question in selected})
+        if missing:
+            raise SystemExit(f"Unknown question id(s): {', '.join(missing)}")
+    if limit is not None:
+        selected = selected[:limit]
+    if not selected:
+        raise SystemExit("No questions selected for evaluation.")
+    return selected
+
+
 def _answer(args: argparse.Namespace) -> None:
     chunks = read_chunks_jsonl(args.chunks)
     if not chunks:
@@ -415,6 +440,7 @@ def _answer(args: argparse.Namespace) -> None:
             json_mode=not args.disable_json_mode,
             api_base=args.llm_api_base or os.getenv(LLM_API_BASE_ENV),
             api_key=args.llm_api_key or os.getenv(LLM_API_KEY_ENV),
+            timeout=args.llm_timeout,
         )
         answer_result = generate_grounded_answer(
             question=args.query,
@@ -442,6 +468,79 @@ def _answer(args: argparse.Namespace) -> None:
                 encoding="utf-8",
             )
             print(f"wrote JSON answer report to {args.output_json}")
+    finally:
+        _run_cleanups(args)
+
+
+def _eval_answers(args: argparse.Namespace) -> None:
+    chunks = read_chunks_jsonl(args.chunks)
+    if not chunks:
+        raise SystemExit(f"No chunks found at {args.chunks}. Run the chunk command first.")
+
+    llm_model = args.llm_model or os.getenv(LLM_MODEL_ENV)
+    if not llm_model:
+        raise SystemExit(f"Set --llm-model or {LLM_MODEL_ENV} before answer evaluation.")
+
+    args._cleanup_callbacks = []
+    try:
+        questions = _filter_questions(
+            load_golden_questions(args.questions),
+            question_ids=args.question_ids,
+            limit=args.limit,
+        )
+        retriever_name, search = _build_single_retriever_run(args, chunks)
+        llm = LiteLLMClient(
+            model=llm_model,
+            temperature=args.temperature,
+            max_tokens=args.max_tokens,
+            json_mode=not args.disable_json_mode,
+            api_base=args.llm_api_base or os.getenv(LLM_API_BASE_ENV),
+            api_key=args.llm_api_key or os.getenv(LLM_API_KEY_ENV),
+            timeout=args.llm_timeout,
+        )
+        run_name = args.run_name or f"{retriever_name}:{llm_model}"
+        report = evaluate_answer_run(
+            questions=questions,
+            search=search,
+            llm=llm,
+            run_name=run_name,
+            retriever=retriever_name,
+            llm_model=llm_model,
+            top_k=args.top_k,
+            candidate_k=max(args.candidate_k, args.top_k),
+            max_context_chars=args.max_context_chars,
+            min_citations=args.min_citations,
+            progress_callback=None
+            if args.quiet
+            else lambda index, total, question: print(
+                f"evaluating {index}/{total} {question.question_id}",
+                flush=True,
+            ),
+        )
+        summary = report.summary()
+        print(f"run={run_name}")
+        print(f"questions={summary.rows}")
+        print(f"retriever={retriever_name}")
+        print(f"llm_model={llm_model}")
+        print(f"answerable={summary.answerable_rows}")
+        print(f"refusal_rows={summary.refusal_rows}")
+        print(f"supported_rate={summary.supported_rate:.3f}")
+        print(f"answerable_supported_rate={summary.answerable_supported_rate:.3f}")
+        print(f"valid_structured_output_rate={summary.valid_structured_output_rate:.3f}")
+        print(f"refusal_accuracy={summary.refusal_accuracy:.3f}")
+        print(f"expected_refusal_success_rate={summary.expected_refusal_success_rate:.3f}")
+        print(f"citation_validity_rate={summary.citation_validity_rate:.3f}")
+        print(f"source_recall@{args.top_k}={summary.source_recall_at_k:.3f}")
+        print(f"expected_citation_hit_rate={summary.expected_citation_hit_rate:.3f}")
+        print(f"mean_latency_seconds={summary.mean_latency_seconds:.2f}")
+        print(f"errors={summary.error_rows}")
+
+        if args.output_json:
+            write_answer_json_report(report, args.output_json)
+            print(f"wrote JSON answer report to {args.output_json}")
+        if args.output_md:
+            write_answer_markdown_report(report, args.output_md)
+            print(f"wrote Markdown answer report to {args.output_md}")
     finally:
         _run_cleanups(args)
 
@@ -600,6 +699,48 @@ def build_parser() -> argparse.ArgumentParser:
     eval_retrieval.add_argument("--output-md", default=None)
     eval_retrieval.set_defaults(func=_eval_retrieval)
 
+    eval_answers = subparsers.add_parser(
+        "eval-answers",
+        help="Evaluate grounded answer generation on a JSONL golden set.",
+    )
+    eval_answers.add_argument("--chunks", required=True)
+    eval_answers.add_argument("--questions", required=True)
+    eval_answers.add_argument(
+        "--retriever",
+        choices=sorted(EVAL_RETRIEVERS),
+        default="hybrid-rerank",
+        help="Retrieval pipeline to use before answer generation.",
+    )
+    eval_answers.add_argument("--top-k", type=int, default=5)
+    eval_answers.add_argument("--candidate-k", type=int, default=20)
+    eval_answers.add_argument("--qdrant-url", default=DEFAULT_QDRANT_URL)
+    eval_answers.add_argument("--qdrant-location", default=None)
+    eval_answers.add_argument("--qdrant-path", default=None)
+    eval_answers.add_argument("--collection", default=DEFAULT_COLLECTION)
+    eval_answers.add_argument("--model", default=DEFAULT_EMBEDDING_MODEL)
+    eval_answers.add_argument("--batch-size", type=int, default=16)
+    eval_answers.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
+    eval_answers.add_argument("--reranker-batch-size", type=int, default=4)
+    eval_answers.add_argument("--reranker-max-length", type=int, default=512)
+    eval_answers.add_argument("--query-prefix", default="")
+    eval_answers.add_argument("--document-prefix", default="")
+    eval_answers.add_argument("--llm-model", default=None)
+    eval_answers.add_argument("--llm-api-base", default=None)
+    eval_answers.add_argument("--llm-api-key", default=None)
+    eval_answers.add_argument("--temperature", type=float, default=0.0)
+    eval_answers.add_argument("--max-tokens", type=int, default=900)
+    eval_answers.add_argument("--llm-timeout", type=float, default=120.0)
+    eval_answers.add_argument("--max-context-chars", type=int, default=4500)
+    eval_answers.add_argument("--min-citations", type=int, default=1)
+    eval_answers.add_argument("--disable-json-mode", action="store_true")
+    eval_answers.add_argument("--question-ids", default=None)
+    eval_answers.add_argument("--limit", type=int, default=None)
+    eval_answers.add_argument("--run-name", default=None)
+    eval_answers.add_argument("--quiet", action="store_true")
+    eval_answers.add_argument("--output-json", default=None)
+    eval_answers.add_argument("--output-md", default=None)
+    eval_answers.set_defaults(func=_eval_answers)
+
     answer = subparsers.add_parser(
         "answer",
         help="Generate a grounded answer with retrieved citations.",
@@ -630,6 +771,7 @@ def build_parser() -> argparse.ArgumentParser:
     answer.add_argument("--llm-api-key", default=None)
     answer.add_argument("--temperature", type=float, default=0.0)
     answer.add_argument("--max-tokens", type=int, default=900)
+    answer.add_argument("--llm-timeout", type=float, default=None)
     answer.add_argument("--max-context-chars", type=int, default=4500)
     answer.add_argument("--min-citations", type=int, default=1)
     answer.add_argument("--disable-json-mode", action="store_true")

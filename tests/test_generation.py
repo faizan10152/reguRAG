@@ -229,6 +229,7 @@ def test_litellm_client_builds_ollama_kwargs() -> None:
         temperature=0.1,
         max_tokens=256,
         api_base="http://localhost:11434",
+        timeout=30.0,
     )
 
     kwargs = client.completion_kwargs([{"role": "user", "content": "test"}])
@@ -237,6 +238,7 @@ def test_litellm_client_builds_ollama_kwargs() -> None:
     assert kwargs["api_base"] == "http://localhost:11434"
     assert kwargs["temperature"] == 0.1
     assert kwargs["max_tokens"] == 256
+    assert kwargs["timeout"] == 30.0
     assert kwargs["response_format"] == {"type": "json_object"}
 
 
