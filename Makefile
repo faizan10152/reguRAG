@@ -66,7 +66,7 @@ ollama-pull-14b:
 	ollama pull qwen3:14b
 
 answer-ollama-local:
-	uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever bm25 --top-k 5 --llm-model "$(OLLAMA_MODEL)" --llm-api-base "$(OLLAMA_API_BASE)"
+	uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever bm25 --top-k 5 --llm-model "$(OLLAMA_MODEL)" --llm-api-base "$(OLLAMA_API_BASE)" --disable-json-mode
 
 answer-ollama-rerank:
-	$(HF_LOCAL_ENV) uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20 --llm-model "$(OLLAMA_MODEL)" --llm-api-base "$(OLLAMA_API_BASE)"
+	$(HF_LOCAL_ENV) uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20 --llm-model "$(OLLAMA_MODEL)" --llm-api-base "$(OLLAMA_API_BASE)" --disable-json-mode

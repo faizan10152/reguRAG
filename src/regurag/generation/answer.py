@@ -17,6 +17,7 @@ from regurag.schemas import CitationValidation, RetrievalResult
 CONFIDENCE_VALUES = {"low", "medium", "high"}
 JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
 EVIDENCE_ALIAS_RE = re.compile(r"\[(E[1-9][0-9]*)\]")
+DEFAULT_MAX_CHARS_PER_CHUNK = 4500
 
 
 @dataclass(frozen=True)
@@ -103,7 +104,7 @@ def generate_grounded_answer(
     question: str,
     retrieved_results: list[RetrievalResult],
     llm: LLMClient,
-    max_chars_per_chunk: int = 1500,
+    max_chars_per_chunk: int = DEFAULT_MAX_CHARS_PER_CHUNK,
     min_citations: int = 1,
 ) -> AnswerGenerationResult:
     if not retrieved_results:

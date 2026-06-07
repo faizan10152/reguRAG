@@ -630,7 +630,7 @@ def build_parser() -> argparse.ArgumentParser:
     answer.add_argument("--llm-api-key", default=None)
     answer.add_argument("--temperature", type=float, default=0.0)
     answer.add_argument("--max-tokens", type=int, default=900)
-    answer.add_argument("--max-context-chars", type=int, default=1500)
+    answer.add_argument("--max-context-chars", type=int, default=4500)
     answer.add_argument("--min-citations", type=int, default=1)
     answer.add_argument("--disable-json-mode", action="store_true")
     answer.add_argument("--dry-run-prompt", action="store_true")

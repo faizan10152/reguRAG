@@ -106,6 +106,8 @@ make answer-ollama-rerank OLLAMA_MODEL=ollama/qwen3:14b \
 
 Ollama runs locally, but ReguRAG still calls it through LiteLLM. The model name uses the LiteLLM provider prefix `ollama/`, while the API base points to the local Ollama server.
 
+The Ollama Make targets disable provider JSON mode and rely on prompt-level strict JSON instead. In testing, `qwen3:14b` returned an empty `{}` object under forced Ollama JSON mode on longer reranked contexts, while prompt-only JSON produced usable structured output.
+
 Reranked local commands run cached Hugging Face models in offline mode:
 
 ```text
@@ -123,6 +125,14 @@ If Ollama rejects explicit JSON mode, run the direct command with:
 ```
 
 The prompt still requests strict JSON, but the server will not receive a JSON-mode parameter.
+
+Answer generation uses a larger per-chunk context window by default:
+
+```text
+--max-context-chars 4500
+```
+
+This matters because legal chunks can be long. In the AI Act employment example, the retrieved chunk contained the correct recruitment/selection sentence after the first 3000 characters; a 1500-character prompt slice made the model miss the actual evidence.
 
 Equivalent direct command:
 

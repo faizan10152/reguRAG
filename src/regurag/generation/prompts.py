@@ -30,7 +30,7 @@ JSON_CONTRACT = """Return this JSON object:
 def format_evidence_context(
     results: list[RetrievalResult],
     *,
-    max_chars_per_chunk: int = 1500,
+    max_chars_per_chunk: int = 4500,
 ) -> str:
     if not results:
         return "No evidence chunks were retrieved."
@@ -70,7 +70,7 @@ def build_answer_messages(
     question: str,
     results: list[RetrievalResult],
     *,
-    max_chars_per_chunk: int = 1500,
+    max_chars_per_chunk: int = 4500,
 ) -> list[dict[str, str]]:
     evidence = format_evidence_context(results, max_chars_per_chunk=max_chars_per_chunk)
     user_prompt = "\n\n".join(
