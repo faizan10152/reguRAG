@@ -16,6 +16,7 @@ from regurag.schemas import CitationValidation, RetrievalResult
 
 CONFIDENCE_VALUES = {"low", "medium", "high"}
 JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
+EVIDENCE_ALIAS_RE = re.compile(r"\[(E[1-9][0-9]*)\]")
 
 
 @dataclass(frozen=True)
@@ -131,10 +132,34 @@ def generate_grounded_answer(
         max_chars_per_chunk=max_chars_per_chunk,
     )
     raw_response = llm.generate(messages)
-    parsed = parse_grounded_answer(raw_response)
-    cited_labels = set(parsed.citations) | extract_citation_labels(parsed.answer)
+    try:
+        parsed = parse_grounded_answer(raw_response)
+    except ValueError as exc:
+        validation = validate_citation_labels(set(), retrieved_results)
+        answer = GroundedAnswer(
+            answer="I cannot answer because the language model returned invalid structured output.",
+            citations=[],
+            confidence="low",
+            unsupported_claims=[raw_response[:500]],
+            should_refuse=True,
+            refusal_reason=f"Invalid LLM response: {exc}",
+        )
+        return AnswerGenerationResult(
+            question=question,
+            answer=answer,
+            retrieved_results=retrieved_results,
+            citation_validation=validation,
+            supported=False,
+            guardrail_triggered=True,
+            raw_response=raw_response,
+        )
+
+    cited_labels = _normalize_generated_citations(parsed, retrieved_results)
     validation = validate_citation_labels(cited_labels, retrieved_results)
-    parsed = _with_citations(parsed, sorted(cited_labels))
+    parsed = _with_citations(
+        _replace_answer_aliases(parsed, retrieved_results),
+        sorted(cited_labels),
+    )
     guardrail_triggered = should_refuse_answer(validation, min_citations=min_citations)
 
     if guardrail_triggered and not parsed.should_refuse:
@@ -173,6 +198,52 @@ def _with_citations(answer: GroundedAnswer, citations: list[str]) -> GroundedAns
         should_refuse=answer.should_refuse,
         refusal_reason=answer.refusal_reason,
     )
+
+
+def _normalize_generated_citations(
+    answer: GroundedAnswer,
+    retrieved_results: list[RetrievalResult],
+) -> set[str]:
+    alias_to_label = _evidence_alias_to_label(retrieved_results)
+    raw_citations = set(answer.citations)
+    raw_citations.update(extract_citation_labels(answer.answer))
+    raw_citations.update(_extract_evidence_aliases(answer.answer))
+
+    normalized = set()
+    for citation in raw_citations:
+        normalized.add(alias_to_label.get(citation, citation))
+    return normalized
+
+
+def _replace_answer_aliases(
+    answer: GroundedAnswer,
+    retrieved_results: list[RetrievalResult],
+) -> GroundedAnswer:
+    alias_to_label = _evidence_alias_to_label(retrieved_results)
+
+    def replace(match: re.Match[str]) -> str:
+        alias = match.group(1)
+        label = alias_to_label.get(alias)
+        if not label:
+            return match.group(0)
+        return f"[{label}]"
+
+    return GroundedAnswer(
+        answer=EVIDENCE_ALIAS_RE.sub(replace, answer.answer),
+        citations=answer.citations,
+        confidence=answer.confidence,
+        unsupported_claims=answer.unsupported_claims,
+        should_refuse=answer.should_refuse,
+        refusal_reason=answer.refusal_reason,
+    )
+
+
+def _extract_evidence_aliases(answer_text: str) -> set[str]:
+    return set(EVIDENCE_ALIAS_RE.findall(answer_text))
+
+
+def _evidence_alias_to_label(retrieved_results: list[RetrievalResult]) -> dict[str, str]:
+    return {f"E{index}": result.citation_label for index, result in enumerate(retrieved_results, start=1)}
 
 
 def _parse_json_object(raw_response: str) -> dict[str, Any]:

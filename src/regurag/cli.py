@@ -217,6 +217,18 @@ def _cached_search(
     return wrapped
 
 
+def _register_cleanup(args: argparse.Namespace, callback: Callable[[], None]) -> None:
+    callbacks = getattr(args, "_cleanup_callbacks", None)
+    if callbacks is not None:
+        callbacks.append(callback)
+
+
+def _run_cleanups(args: argparse.Namespace) -> None:
+    callbacks = getattr(args, "_cleanup_callbacks", [])
+    for callback in reversed(callbacks):
+        callback()
+
+
 def _build_eval_retriever_runs(
     args: argparse.Namespace,
     chunks: list[Chunk],
@@ -247,6 +259,7 @@ def _build_eval_retriever_runs(
             location=args.qdrant_location,
             path=args.qdrant_path,
         )
+        _register_cleanup(args, dense_retriever.close)
         dense_search = _cached_search(
             lambda query: dense_retriever.search(
                 query_vector=embedder.encode_query(query),
@@ -305,42 +318,46 @@ def _eval_retrieval(args: argparse.Namespace) -> None:
     if not chunks:
         raise SystemExit(f"No chunks found at {args.chunks}. Run the chunk command first.")
 
-    questions = load_golden_questions(args.questions)
-    candidate_k = max(args.candidate_k, args.top_k)
-    runs = _build_eval_retriever_runs(args, chunks)
-    report = evaluate_retrieval_runs(
-        questions=questions,
-        retriever_runs=runs,
-        top_k=args.top_k,
-        candidate_k=candidate_k,
-    )
-
-    print(f"questions={len(questions)}")
-    print(f"top_k={args.top_k}")
-    print(f"candidate_k={candidate_k}")
-    for summary in report.summaries():
-        print(
-            f"{summary.retriever}: "
-            f"answerable={summary.answerable_rows} "
-            f"recall@{args.top_k}={summary.source_recall_at_k:.3f} "
-            f"hit@{args.top_k}={summary.source_hit_rate_at_k:.3f} "
-            f"mrr={summary.source_mrr:.3f}"
+    args._cleanup_callbacks = []
+    try:
+        questions = load_golden_questions(args.questions)
+        candidate_k = max(args.candidate_k, args.top_k)
+        runs = _build_eval_retriever_runs(args, chunks)
+        report = evaluate_retrieval_runs(
+            questions=questions,
+            retriever_runs=runs,
+            top_k=args.top_k,
+            candidate_k=candidate_k,
         )
-        if summary.citation_labeled_rows:
+
+        print(f"questions={len(questions)}")
+        print(f"top_k={args.top_k}")
+        print(f"candidate_k={candidate_k}")
+        for summary in report.summaries():
             print(
                 f"{summary.retriever}: "
-                f"citation_labeled={summary.citation_labeled_rows} "
-                f"citation_recall@{args.top_k}={summary.citation_recall_at_k:.3f} "
-                f"citation_hit@{args.top_k}={summary.citation_hit_rate_at_k:.3f} "
-                f"citation_mrr={summary.citation_mrr:.3f}"
+                f"answerable={summary.answerable_rows} "
+                f"recall@{args.top_k}={summary.source_recall_at_k:.3f} "
+                f"hit@{args.top_k}={summary.source_hit_rate_at_k:.3f} "
+                f"mrr={summary.source_mrr:.3f}"
             )
+            if summary.citation_labeled_rows:
+                print(
+                    f"{summary.retriever}: "
+                    f"citation_labeled={summary.citation_labeled_rows} "
+                    f"citation_recall@{args.top_k}={summary.citation_recall_at_k:.3f} "
+                    f"citation_hit@{args.top_k}={summary.citation_hit_rate_at_k:.3f} "
+                    f"citation_mrr={summary.citation_mrr:.3f}"
+                )
 
-    if args.output_json:
-        write_json_report(report, args.output_json)
-        print(f"wrote JSON report to {args.output_json}")
-    if args.output_md:
-        write_markdown_report(report, args.output_md)
-        print(f"wrote Markdown report to {args.output_md}")
+        if args.output_json:
+            write_json_report(report, args.output_json)
+            print(f"wrote JSON report to {args.output_json}")
+        if args.output_md:
+            write_markdown_report(report, args.output_md)
+            print(f"wrote Markdown report to {args.output_md}")
+    finally:
+        _run_cleanups(args)
 
 
 def _build_single_retriever_run(
@@ -359,70 +376,74 @@ def _answer(args: argparse.Namespace) -> None:
     if not chunks:
         raise SystemExit(f"No chunks found at {args.chunks}. Run the chunk command first.")
 
-    retriever_name, search = _build_single_retriever_run(args, chunks)
-    results = search(args.query)[: args.top_k]
+    args._cleanup_callbacks = []
+    try:
+        retriever_name, search = _build_single_retriever_run(args, chunks)
+        results = search(args.query)[: args.top_k]
 
-    if args.dry_run_prompt:
-        messages = build_answer_messages(
-            args.query,
-            results,
-            max_chars_per_chunk=args.max_context_chars,
-        )
-        print(
-            json.dumps(
-                {
-                    "question": args.query,
-                    "retriever": retriever_name,
-                    "messages": messages,
-                    "retrieved_results": _retrieval_results_payload(results),
-                },
-                indent=2,
-                ensure_ascii=False,
+        if args.dry_run_prompt:
+            messages = build_answer_messages(
+                args.query,
+                results,
+                max_chars_per_chunk=args.max_context_chars,
             )
-        )
-        return
+            print(
+                json.dumps(
+                    {
+                        "question": args.query,
+                        "retriever": retriever_name,
+                        "messages": messages,
+                        "retrieved_results": _retrieval_results_payload(results),
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
+            return
 
-    llm_model = args.llm_model or os.getenv(LLM_MODEL_ENV)
-    if not llm_model:
-        raise SystemExit(
-            f"Set --llm-model or {LLM_MODEL_ENV} before running answer generation. "
-            "Use --dry-run-prompt to inspect retrieval and prompting without an LLM call."
+        llm_model = args.llm_model or os.getenv(LLM_MODEL_ENV)
+        if not llm_model:
+            raise SystemExit(
+                f"Set --llm-model or {LLM_MODEL_ENV} before running answer generation. "
+                "Use --dry-run-prompt to inspect retrieval and prompting without an LLM call."
+            )
+
+        llm = LiteLLMClient(
+            model=llm_model,
+            temperature=args.temperature,
+            max_tokens=args.max_tokens,
+            json_mode=not args.disable_json_mode,
+            api_base=args.llm_api_base or os.getenv(LLM_API_BASE_ENV),
+            api_key=args.llm_api_key or os.getenv(LLM_API_KEY_ENV),
+        )
+        answer_result = generate_grounded_answer(
+            question=args.query,
+            retrieved_results=results,
+            llm=llm,
+            max_chars_per_chunk=args.max_context_chars,
+            min_citations=args.min_citations,
+        )
+        llm_api_base = args.llm_api_base or os.getenv(LLM_API_BASE_ENV)
+        _print_answer_result(
+            answer_result,
+            retriever_name=retriever_name,
+            llm_model=llm_model,
+            llm_api_base=llm_api_base,
         )
 
-    llm = LiteLLMClient(
-        model=llm_model,
-        temperature=args.temperature,
-        max_tokens=args.max_tokens,
-        json_mode=not args.disable_json_mode,
-        api_base=args.llm_api_base or os.getenv(LLM_API_BASE_ENV),
-        api_key=args.llm_api_key or os.getenv(LLM_API_KEY_ENV),
-    )
-    answer_result = generate_grounded_answer(
-        question=args.query,
-        retrieved_results=results,
-        llm=llm,
-        max_chars_per_chunk=args.max_context_chars,
-        min_citations=args.min_citations,
-    )
-    llm_api_base = args.llm_api_base or os.getenv(LLM_API_BASE_ENV)
-    _print_answer_result(
-        answer_result,
-        retriever_name=retriever_name,
-        llm_model=llm_model,
-        llm_api_base=llm_api_base,
-    )
-
-    if args.output_json:
-        payload = answer_result.to_dict()
-        payload["retriever"] = retriever_name
-        payload["llm_model"] = llm_model
-        payload["llm_api_base"] = llm_api_base
-        Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.output_json).write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        print(f"wrote JSON answer report to {args.output_json}")
+        if args.output_json:
+            payload = answer_result.to_dict()
+            payload["retriever"] = retriever_name
+            payload["llm_model"] = llm_model
+            payload["llm_api_base"] = llm_api_base
+            Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.output_json).write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            print(f"wrote JSON answer report to {args.output_json}")
+    finally:
+        _run_cleanups(args)
 
 
 def _print_answer_result(

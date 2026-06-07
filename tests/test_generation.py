@@ -19,6 +19,14 @@ class FakeLLM:
         return json.dumps(self.response)
 
 
+class RawFakeLLM:
+    def __init__(self, response: str) -> None:
+        self.response = response
+
+    def generate(self, messages: list[dict[str, str]]) -> str:
+        return self.response
+
+
 def _result() -> RetrievalResult:
     chunk = Chunk(
         chunk_id="aaaabbbbccccdddd",
@@ -54,7 +62,8 @@ def test_parse_grounded_answer_rejects_non_json() -> None:
 def test_format_evidence_context_includes_exact_citation_label() -> None:
     context = format_evidence_context([_result()])
 
-    assert "[eu_ai_act_en:aaaabbbbccccdddd]" in context
+    assert "[E1]" in context
+    assert "Citation label: eu_ai_act_en:aaaabbbbccccdddd" in context
     assert "EU AI Act" in context
     assert "Annex III" in context
 
@@ -71,8 +80,8 @@ def test_build_answer_messages_contains_question_and_contract() -> None:
 def test_generate_grounded_answer_marks_supported_when_citations_are_valid() -> None:
     llm = FakeLLM(
         {
-            "answer": "Recruitment systems can be high-risk [eu_ai_act_en:aaaabbbbccccdddd].",
-            "citations": ["eu_ai_act_en:aaaabbbbccccdddd"],
+            "answer": "Recruitment systems can be high-risk [E1].",
+            "citations": ["E1"],
             "confidence": "medium",
             "unsupported_claims": [],
             "should_refuse": False,
@@ -89,14 +98,39 @@ def test_generate_grounded_answer_marks_supported_when_citations_are_valid() -> 
     assert result.supported
     assert not result.guardrail_triggered
     assert result.citation_validation.is_supported
+    assert result.answer.citations == ["eu_ai_act_en:aaaabbbbccccdddd"]
+    assert "[eu_ai_act_en:aaaabbbbccccdddd]" in result.answer.answer
     assert len(llm.calls) == 1
 
 
 def test_generate_grounded_answer_normalizes_inline_citations() -> None:
     llm = FakeLLM(
         {
-            "answer": "Recruitment systems can be high-risk [eu_ai_act_en:aaaabbbbccccdddd].",
+            "answer": "Recruitment systems can be high-risk [E1].",
             "citations": [],
+            "confidence": "medium",
+            "unsupported_claims": [],
+            "should_refuse": False,
+            "refusal_reason": None,
+        }
+    )
+
+    result = generate_grounded_answer(
+        question="Is CV screening high-risk?",
+        retrieved_results=[_result()],
+        llm=llm,
+    )
+
+    assert result.supported
+    assert result.answer.citations == ["eu_ai_act_en:aaaabbbbccccdddd"]
+    assert "[eu_ai_act_en:aaaabbbbccccdddd]" in result.answer.answer
+
+
+def test_generate_grounded_answer_accepts_exact_labels_for_backward_compatibility() -> None:
+    llm = FakeLLM(
+        {
+            "answer": "Recruitment systems can be high-risk [eu_ai_act_en:aaaabbbbccccdddd].",
+            "citations": ["eu_ai_act_en:aaaabbbbccccdddd"],
             "confidence": "medium",
             "unsupported_claims": [],
             "should_refuse": False,
@@ -117,8 +151,8 @@ def test_generate_grounded_answer_normalizes_inline_citations() -> None:
 def test_generate_grounded_answer_triggers_guardrail_for_missing_citation() -> None:
     llm = FakeLLM(
         {
-            "answer": "This is supported [gdpr_en:eeeeffff00001111].",
-            "citations": ["gdpr_en:eeeeffff00001111"],
+            "answer": "This is supported [E9].",
+            "citations": ["E9"],
             "confidence": "high",
             "unsupported_claims": [],
             "should_refuse": False,
@@ -136,7 +170,35 @@ def test_generate_grounded_answer_triggers_guardrail_for_missing_citation() -> N
     assert result.guardrail_triggered
     assert result.answer.should_refuse
     assert result.answer.refusal_reason == "Citation validation failed."
-    assert result.citation_validation.missing_labels == {"gdpr_en:eeeeffff00001111"}
+    assert result.citation_validation.missing_labels == {"E9"}
+
+
+def test_generate_grounded_answer_refuses_invalid_structured_output() -> None:
+    llm = RawFakeLLM(
+        json.dumps(
+            {
+                "answer": "",
+                "citations": [],
+                "confidence": "low",
+                "unsupported_claims": [],
+                "should_refuse": False,
+                "refusal_reason": None,
+            }
+        )
+    )
+
+    result = generate_grounded_answer(
+        question="Is CV screening high-risk?",
+        retrieved_results=[_result()],
+        llm=llm,
+    )
+
+    assert not result.supported
+    assert result.guardrail_triggered
+    assert result.answer.should_refuse
+    assert result.answer.refusal_reason
+    assert result.answer.refusal_reason.startswith("Invalid LLM response")
+    assert result.raw_response == llm.response
 
 
 def test_generate_grounded_answer_refuses_without_retrieved_evidence() -> None:

@@ -1,5 +1,6 @@
-OLLAMA_MODEL ?= ollama/qwen3:8b
+OLLAMA_MODEL ?= ollama/qwen3:14b
 OLLAMA_API_BASE ?= http://localhost:11434
+HF_LOCAL_ENV ?= HF_HUB_DISABLE_XET=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 
 .PHONY: install test lint pre-commit-install api docker-up qdrant-up download chunk search dense-index dense-search compare eval-retrieval eval-retrieval-local eval-rerank-local answer-dry-run answer-local ollama-pull-8b ollama-pull-14b answer-ollama-local answer-ollama-rerank
 
@@ -50,13 +51,13 @@ eval-retrieval-local:
 	uv run --extra rag regurag eval-retrieval --chunks data/processed/chunks.jsonl --questions data/eval/golden_questions_v1.jsonl --retrievers bm25,dense,hybrid --qdrant-path .qdrant/local --output-md reports/retrieval_eval_latest.md --output-json reports/retrieval_eval_latest.json
 
 eval-rerank-local:
-	HF_HUB_DISABLE_XET=1 uv run --extra rag regurag eval-retrieval --chunks data/processed/chunks.jsonl --questions data/eval/golden_questions_v1.jsonl --retrievers bm25,dense,hybrid,hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20 --reranker-batch-size 4 --output-md reports/retrieval_eval_rerank_latest.md --output-json reports/retrieval_eval_rerank_latest.json
+	$(HF_LOCAL_ENV) uv run --extra rag regurag eval-retrieval --chunks data/processed/chunks.jsonl --questions data/eval/golden_questions_v1.jsonl --retrievers bm25,dense,hybrid,hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20 --reranker-batch-size 4 --output-md reports/retrieval_eval_rerank_latest.md --output-json reports/retrieval_eval_rerank_latest.json
 
 answer-dry-run:
 	uv run regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever bm25 --top-k 5 --dry-run-prompt
 
 answer-local:
-	HF_HUB_DISABLE_XET=1 uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20
+	$(HF_LOCAL_ENV) uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20
 
 ollama-pull-8b:
 	ollama pull qwen3:8b
@@ -68,4 +69,4 @@ answer-ollama-local:
 	uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever bm25 --top-k 5 --llm-model "$(OLLAMA_MODEL)" --llm-api-base "$(OLLAMA_API_BASE)"
 
 answer-ollama-rerank:
-	HF_HUB_DISABLE_XET=1 uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20 --llm-model "$(OLLAMA_MODEL)" --llm-api-base "$(OLLAMA_API_BASE)"
+	$(HF_LOCAL_ENV) uv run --extra rag regurag answer --chunks data/processed/chunks.jsonl --query "$(q)" --retriever hybrid-rerank --qdrant-path .qdrant/bge-m3 --model BAAI/bge-m3 --reranker-model cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 --top-k 5 --candidate-k 20 --llm-model "$(OLLAMA_MODEL)" --llm-api-base "$(OLLAMA_API_BASE)"

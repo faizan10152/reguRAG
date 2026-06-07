@@ -115,6 +115,11 @@ class QdrantDenseRetriever:
 
         return results
 
+    def close(self) -> None:
+        close = getattr(self.client, "close", None)
+        if callable(close):
+            close()
+
     def _query_points(self, query_vector: list[float], top_k: int):
         if hasattr(self.client, "query_points"):
             response = self.client.query_points(

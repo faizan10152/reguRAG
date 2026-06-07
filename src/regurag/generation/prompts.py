@@ -9,8 +9,8 @@ You are not a lawyer and must not present the answer as binding legal advice.
 
 Rules:
 - Use only the evidence chunks in the user message.
-- Cite every factual claim with exact labels like [source_id:chunk_id].
-- Never cite a label that is not present in the evidence.
+- Cite every factual claim with short evidence IDs like [E1], [E2], or [E3].
+- Never invent evidence IDs. Use only IDs that are present in the evidence.
 - If the evidence is insufficient, set should_refuse to true and explain why.
 - Return strict JSON only. Do not wrap it in markdown.
 """
@@ -18,7 +18,7 @@ Rules:
 JSON_CONTRACT = """Return this JSON object:
 {
   "answer": "short grounded answer with inline citations, or a refusal",
-  "citations": ["source_id:chunk_id"],
+  "citations": ["E1"],
   "confidence": "low|medium|high",
   "unsupported_claims": ["claim that could not be supported"],
   "should_refuse": false,
@@ -36,8 +36,9 @@ def format_evidence_context(
         return "No evidence chunks were retrieved."
 
     blocks = []
-    for result in results:
+    for index, result in enumerate(results, start=1):
         chunk = result.chunk
+        evidence_id = f"E{index}"
         title = str(chunk.metadata.get("title") or chunk.source_id)
         heading = str(chunk.metadata.get("section_heading") or "no section")
         url = chunk.metadata.get("url")
@@ -48,7 +49,8 @@ def format_evidence_context(
         blocks.append(
             "\n".join(
                 [
-                    f"[{chunk.citation_label}]",
+                    f"[{evidence_id}]",
+                    f"Citation label: {chunk.citation_label}",
                     f"Title: {title}",
                     f"Section: {heading}",
                     f"URL: {url or 'unknown'}",

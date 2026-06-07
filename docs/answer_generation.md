@@ -74,6 +74,10 @@ For a stronger local model, try:
 make ollama-pull-14b
 ```
 
+On macOS, prefer the official Ollama app bundle if the Homebrew formula fails with a
+missing `llama-server` runtime. The downloaded model cache remains under `~/.ollama`,
+so switching the Ollama runtime does not redownload the model.
+
 Start with BM25-only retrieval to isolate model behavior:
 
 ```bash
@@ -89,7 +93,7 @@ make answer-ollama-rerank q="Is AI CV screening high-risk under the AI Act?"
 By default, these targets use:
 
 ```text
-OLLAMA_MODEL=ollama/qwen3:8b
+OLLAMA_MODEL=ollama/qwen3:14b
 OLLAMA_API_BASE=http://localhost:11434
 ```
 
@@ -101,6 +105,16 @@ make answer-ollama-rerank OLLAMA_MODEL=ollama/qwen3:14b \
 ```
 
 Ollama runs locally, but ReguRAG still calls it through LiteLLM. The model name uses the LiteLLM provider prefix `ollama/`, while the API base points to the local Ollama server.
+
+Reranked local commands run cached Hugging Face models in offline mode:
+
+```text
+HF_HUB_DISABLE_XET=1
+HF_HUB_OFFLINE=1
+TRANSFORMERS_OFFLINE=1
+```
+
+This prevents model-loader metadata checks from leaving background network threads alive after the CLI has printed its result. Pull or cache the embedding/reranker models once before using the offline reranked targets.
 
 If Ollama rejects explicit JSON mode, run the direct command with:
 
