@@ -1,183 +1,165 @@
-# ReguRAG
+# AI Regulation Evidence Workbench
 
-ReguRAG is a bilingual regulatory intelligence RAG system for EU AI Act, GDPR, and German AI governance sources.
+A bilingual regulatory RAG workbench for EU AI Act, GDPR, and German AI governance sources.
 
-The system is designed around traceable answers from official documents, not generic document chat. It combines reproducible ingestion, source-aware chunking, lexical and dense retrieval, hybrid fusion, reranking, grounded answer generation, citation enforcement, refusal behavior, evaluation, observability, and CI quality gates.
+The system is designed for traceable regulatory research, not generic document chat. It ingests official sources, chunks them with source metadata, retrieves evidence with lexical and dense methods, reranks candidates, generates grounded answers with citations, validates those citations, and evaluates both retrieval and answer quality.
 
-## Problem Statement
+> This is decision-support software for regulatory research. It is not legal advice.
 
-German companies adopting AI in HR, finance, healthcare, and business operations need reliable answers to questions like:
+## Demo
 
-- Does this AI use case look high-risk under the EU AI Act?
-- What GDPR issues appear if we use customer support data for model training?
-- What documentation or AI literacy expectations apply to employees using AI tools?
+[Watch the short workbench walkthrough](docs/assets/workbench-demo.webm)
+
+| Workbench overview | Grounded answer with citations |
+| --- | --- |
+| ![Workbench overview](docs/assets/workbench-overview.png) | ![Grounded answer with citations](docs/assets/grounded-answer-with-citations.png) |
+
+![Mobile answer view](docs/assets/workbench-mobile.png)
+
+## Problem
+
+German companies adopting AI in HR, finance, healthcare, and business operations need reliable answers to questions such as:
+
+- Is an AI system used for CV screening high-risk under the EU AI Act?
+- Does GDPR require a DPIA for every AI system processing personal data?
+- Which obligations apply when employees use AI tools in business workflows?
 - Which official source supports the answer?
 - When should the system refuse because the evidence is not in the corpus?
 
-ReguRAG retrieves and answers from official EU and German sources, with every answer tied back to retrieved evidence. It is decision support for regulatory research, not legal advice.
+The project focuses on the engineering problem behind those questions: building a RAG system that can retrieve exact regulatory evidence, cite it, and expose where the system is still weak.
 
-## Current System
+## What It Demonstrates
 
-The current system contains:
+- Source-aware ingestion from official EU and German regulatory documents.
+- BM25 retrieval for exact legal terms, article numbers, German phrases, and acronyms.
+- Dense retrieval with Qdrant and sentence-transformers.
+- Hybrid retrieval with reciprocal rank fusion.
+- Cross-encoder reranking for query-chunk relevance.
+- Grounded answer generation through LiteLLM and local Ollama models.
+- Citation aliasing, citation validation, unsupported-claim checks, and refusal behavior.
+- Golden-question retrieval evaluation with source-level and exact-citation metrics.
+- Answer-level evaluation for structured output, citation validity, refusal behavior, and latency.
+- FastAPI backend and React/TypeScript workbench frontend.
+- Pre-commit checks, ruff, pytest, Docker Compose, and reproducible local commands.
 
-- Source manifest for official EU/German regulatory sources.
-- Reproducible downloader for raw source files.
-- Text extraction and article-aware chunking utilities.
-- Transparent BM25 retrieval baseline.
-- Dense retrieval commands backed by Qdrant and sentence-transformers.
-- Reciprocal rank fusion for hybrid retrieval.
-- Cross-encoder reranking.
-- Structured LLM answer generation through LiteLLM.
-- Citation extraction and validation.
-- Refusal gate for unsupported answers.
-- Retrieval evaluation over an approved 38-question golden set.
-- Answer-level evaluation for structured output, citation support, refusal behavior, and latency.
-- React workbench for grounded answers, citation inspection, retrieved evidence, and evaluation snapshot.
-- Source-level and citation-level retrieval metrics: Recall@K, Precision@K, Hit@K, MRR.
-- FastAPI shell with retrieval-only `/query` endpoint.
-- Docker Compose with API and Qdrant.
-- GitHub Actions CI for tests and linting.
-
-## Target Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
   A["Official EU/German sources"] --> B["Downloader + source manifest"]
   B --> C["Text extraction"]
-  C --> D["Article-aware chunking"]
-  D --> E["BM25 baseline"]
+  C --> D["Source-aware chunking"]
+  D --> E["BM25 lexical retrieval"]
   D --> F["Dense embeddings in Qdrant"]
   E --> G["Hybrid retrieval + RRF"]
   F --> G
   G --> H["Cross-encoder reranker"]
-  H --> I["LLM answer generator"]
+  H --> I["Grounded LLM answer"]
   I --> J["Citation validator + refusal gate"]
-  J --> K["FastAPI / UI"]
-  J --> L["Evaluation + CI gate"]
-  J --> M["Langfuse traces"]
+  J --> K["FastAPI backend"]
+  K --> L["React workbench"]
+  J --> M["Retrieval + answer evaluation"]
 ```
 
-## Quick Start
+## Tech Stack
 
-Recommended local setup:
+| Layer | Tools |
+| --- | --- |
+| Backend | Python 3.11, FastAPI, Pydantic |
+| Retrieval | BM25, Qdrant, sentence-transformers, BGE-M3 |
+| Reranking | cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 |
+| Generation | LiteLLM, Ollama, Qwen3 14B |
+| Frontend | React, TypeScript, Vite, lucide-react |
+| Evaluation | Golden questions, source recall, exact citation metrics, answer validation |
+| Quality | pytest, ruff, pre-commit, Docker Compose |
+
+## Evaluation Snapshot
+
+The benchmark uses 38 curated golden questions across HR, finance, healthcare, business operations, legal basics, cross-lingual German/English cases, and refusal cases.
+
+### Retrieval
+
+Best current top-5 retrieval run:
+
+| Retriever | Source Recall@5 | Source Hit@5 | Source MRR | Citation Recall@5 | Citation Hit@5 | Citation MRR |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Hybrid RRF + cross-encoder rerank | 0.635 | 0.906 | 0.731 | 0.236 | 0.417 | 0.190 |
+
+The source-level result is decent, but the exact-citation result is intentionally stricter. It shows the real bottleneck: finding the exact supporting chunk, not merely the right PDF or regulation.
+
+See [docs/retrieval_experiments.md](docs/retrieval_experiments.md) and [docs/retrieval_evaluation.md](docs/retrieval_evaluation.md).
+
+### Answer Generation
+
+Current local answer-evaluation smoke set with `ollama/qwen3:14b`:
+
+| Rows | Answerable Supported | Valid Structured Output | Expected Refusal Success | Citation Validity | Source Recall@5 | Expected Citation Hit | Mean Latency |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 8 | 0.667 | 0.875 | 1.000 | 1.000 | 0.556 | 0.167 | 75.36s |
+
+This is useful but not final. Refusal behavior and citation validity are strong in the smoke set, while exact evidence retrieval and local-generation latency remain the main improvement areas.
+
+See [docs/answer_generation_experiments.md](docs/answer_generation_experiments.md), [docs/answer_generation.md](docs/answer_generation.md), and [docs/answer_evaluation.md](docs/answer_evaluation.md).
+
+## Local Setup
+
+Clone and install backend dependencies:
 
 ```bash
-cd /Users/faizan/Desktop/regurag
+cd regurag
 uv venv --python 3.11
-uv pip install -e ".[api,dev,ingestion]"
+uv pip install -e ".[api,dev,ingestion,rag]"
 uv run pre-commit install
-uv run pytest
 ```
 
-The pre-commit hook blocks commits when project requirements fail:
-
-- no staged `.env` files
-- no staged generated `data/raw/*` or `data/processed/*` artifacts, except `.gitkeep`
-- no obvious API keys or private keys in text files
-- `ruff check .` must pass
-- `pytest` must pass
-
-Run the retrieval-only API:
+Install frontend dependencies:
 
 ```bash
-uv run uvicorn regurag.api.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Open:
-
-```text
-http://localhost:8000/docs
-```
-
-Run local search before real ingestion:
-
-```bash
-uv run regurag search --chunks data/processed/chunks.jsonl --query "AI systems for employment screening"
+make frontend-install
 ```
 
 Download and chunk official sources:
 
 ```bash
-uv run regurag download --manifest configs/source_manifest.json --raw-dir data/raw
-uv run regurag chunk --manifest configs/source_manifest.json --raw-dir data/raw --out data/processed/chunks.jsonl
+make download
+make chunk
 ```
 
-Docker:
+Build the BGE-M3 dense index:
 
 ```bash
-docker compose up --build
-```
-
-Dense retrieval:
-
-```bash
-docker compose up -d qdrant
-uv run --extra rag regurag dense-index --chunks data/processed/chunks.jsonl
-uv run --extra rag regurag dense-search --query "Can we train a model on customer support tickets?"
-uv run --extra rag regurag compare-retrieval --chunks data/processed/chunks.jsonl --query "Can we train a model on customer support tickets?"
-```
-
-The default embedding model is `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` because it is fast enough for local iteration. For stronger multilingual retrieval, switch to:
-
-```bash
-uv run --extra rag regurag dense-index \
+HF_HUB_DISABLE_XET=1 uv run --extra rag regurag dense-index \
   --chunks data/processed/chunks.jsonl \
   --model BAAI/bge-m3 \
+  --qdrant-path .qdrant/bge-m3 \
   --batch-size 4
 ```
 
-Retrieval evaluation:
+Pull the local LLM:
 
 ```bash
-uv run regurag eval-retrieval \
-  --chunks data/processed/chunks.jsonl \
-  --questions data/eval/golden_questions_v1.jsonl \
-  --retrievers bm25
+make ollama-pull-14b
 ```
 
-Full local BM25 + dense + hybrid evaluation without Docker:
+Start the RAG API on a fresh machine:
 
 ```bash
-uv run --extra rag regurag eval-retrieval \
-  --chunks data/processed/chunks.jsonl \
-  --questions data/eval/golden_questions_v1.jsonl \
-  --retrievers bm25,dense,hybrid \
-  --qdrant-path .qdrant/local \
-  --output-md reports/retrieval_eval_latest.md \
-  --output-json reports/retrieval_eval_latest.json
+HF_HUB_DISABLE_XET=1 \
+REGURAG_LLM_MODEL=ollama/qwen3:14b \
+REGURAG_LLM_API_BASE=http://localhost:11434 \
+uv run --extra api --extra rag uvicorn regurag.api.main:app \
+  --reload --host 0.0.0.0 --port 8000
 ```
 
-Hybrid reranking evaluation with the BGE-M3 index:
-
-```bash
-make eval-rerank-local
-```
-
-Inspect the answer-generation prompt without API calls:
-
-```bash
-make answer-dry-run q="Is AI CV screening high-risk under the AI Act?"
-```
-
-Run grounded answer generation through LiteLLM:
-
-```bash
-REGURAG_LLM_MODEL="<provider>/<model>" make answer-local \
-  q="Is AI CV screening high-risk under the AI Act?"
-```
-
-Run grounded answer generation locally with Ollama:
-
-```bash
-make ollama-pull-8b
-make answer-ollama-local q="Is AI CV screening high-risk under the AI Act?"
-```
-
-Run the local workbench:
+After the embedding and reranker models are cached locally, the shorter offline command is:
 
 ```bash
 make api-rag
-make frontend-install
+```
+
+In another terminal, start the frontend:
+
+```bash
 make frontend-dev
 ```
 
@@ -187,39 +169,68 @@ Open:
 http://localhost:5173
 ```
 
-Run the local answer evaluation smoke set:
+## Useful Commands
+
+Run tests and linting:
+
+```bash
+uv run pytest
+uv run ruff check .
+```
+
+Run retrieval evaluation:
+
+```bash
+make eval-rerank-local
+```
+
+Run answer evaluation with local Ollama:
 
 ```bash
 make eval-answers-ollama
 ```
 
-See [docs/retrieval_evaluation.md](docs/retrieval_evaluation.md) for metric definitions and the current baseline snapshot.
-See [docs/retrieval_experiments.md](docs/retrieval_experiments.md) for the running experiment log.
-See [docs/answer_generation.md](docs/answer_generation.md) for the structured answer and citation-validation workflow.
-See [docs/answer_evaluation.md](docs/answer_evaluation.md) for answer-level metrics.
+Ask a local grounded question from the CLI:
 
-## Why BM25 First?
+```bash
+make answer-ollama-rerank q="Is AI CV screening high-risk under the AI Act?"
+```
 
-BM25 is a keyword retrieval algorithm. It is not "old-fashioned"; it is still useful in legal and regulatory RAG because exact terms matter:
+Run the frontend production build:
 
-- Article numbers
-- Acronyms
-- German legal phrases
-- Regulator names
-- Domain terms like "high-risk", "AI literacy", "legal basis"
+```bash
+make frontend-build
+```
 
-Dense vector search is better at semantic similarity, but it can miss exact terms. The production version will combine BM25 and dense vectors, then rerank.
+## Repository Guide
 
-## Next Milestones
+| Path | Purpose |
+| --- | --- |
+| [configs/source_manifest.json](configs/source_manifest.json) | Official source list and metadata |
+| [src/regurag/ingestion](src/regurag/ingestion) | Downloading, extraction, and chunking |
+| [src/regurag/retrieval](src/regurag/retrieval) | BM25, dense Qdrant retrieval, and fusion |
+| [src/regurag/reranking](src/regurag/reranking) | Cross-encoder reranking |
+| [src/regurag/generation](src/regurag/generation) | Prompting, LiteLLM client, grounded answer flow |
+| [src/regurag/grounding](src/regurag/grounding) | Citation parsing and validation |
+| [src/regurag/evaluation](src/regurag/evaluation) | Retrieval and answer evaluation runners |
+| [src/regurag/api](src/regurag/api) | FastAPI endpoints |
+| [frontend](frontend) | React/TypeScript evidence workbench |
+| [data/eval/golden_questions_v1.jsonl](data/eval/golden_questions_v1.jsonl) | Golden-question benchmark |
+| [docs](docs) | Architecture notes, evaluation notes, experiment logs |
 
-1. Manually label answer evaluation rows as correct, partially correct, wrong, or unclear.
-2. Expand exact citation labels from 12 to all answerable questions.
-3. Improve legal chunking with article-aware splits.
-4. Try a stronger reranker such as `BAAI/bge-reranker-v2-m3`.
-5. Add Langfuse tracing.
-6. Build a simple bilingual UI.
-7. Add deployment documentation and operational runbooks.
+## Current Limitations
 
-## Technical Summary
+- The public demo is documented with screenshots and video instead of a hosted live backend because local Qwen/Ollama inference is compute-heavy.
+- Exact citation retrieval is still weak. The next serious improvement is article-aware or parent-child chunking.
+- The answer evaluation set is a small smoke set. It should be expanded after the retrieval layer improves.
+- Local latency is high with Qwen3 14B on CPU/GPU-constrained hardware.
+- The system supports regulatory research only and should not present outputs as binding legal advice.
 
-ReguRAG is a production-shaped RAG system for AI Act/GDPR regulatory research in German business contexts. It uses source-aware ingestion, BM25 and dense retrieval, hybrid fusion, reranking, structured LLM answer generation, citation validation, refusal handling, retrieval metrics, CI, and Dockerized deployment.
+## Roadmap
+
+1. Improve legal chunking with article-aware and annex-aware splits.
+2. Add parent-child retrieval so short chunks retrieve precise evidence while larger parent spans provide context.
+3. Expand exact citation labels from 12 questions to all answerable questions.
+4. Try stronger multilingual rerankers such as `BAAI/bge-reranker-v2-m3`.
+5. Add Langfuse tracing for prompt, retrieval, latency, and citation-debug observability.
+6. Expand answer-level evaluation and add manual correctness labels.
