@@ -1,98 +1,35 @@
 # Roadmap
 
-## Week 1 Goal
+This document tracks what has already been built and what is still planned. The API, grounded answer generation, and React workbench are complete for the current local MVP; they are no longer future milestones.
 
-Create a credible first version of the regulatory intelligence system:
+## Completed MVP
 
-- local API works
-- ingestion is reproducible
-- retrieval works on official sources
-- citations are visible
-- evaluation plan exists
-- README explains the system scope and technical value
+- Standalone Python repository with tests, linting, pre-commit checks, Docker Compose, and reproducible commands.
+- Official EU/German source manifest, downloader, text extraction, and source-aware chunking.
+- BM25 lexical retrieval baseline.
+- Dense Qdrant retrieval with multilingual embedding models.
+- Hybrid retrieval with reciprocal rank fusion.
+- Cross-encoder reranking.
+- Golden-question retrieval evaluation with source-level and exact-citation metrics.
+- Grounded answer generation through LiteLLM and local Ollama models.
+- Citation aliasing, citation validation, unsupported-claim checks, and refusal behavior.
+- Answer-level evaluation for structured output, refusal behavior, citation validity, and latency.
+- FastAPI endpoints for retrieval-only search, grounded answers, and evaluation snapshots.
+- React/TypeScript evidence workbench with answer, citation, evidence, and metric panels.
+- GitHub-facing README with screenshots and a short local demo video.
 
-## Day 1: Repo and Foundations
+## Current Next Milestones
 
-- Create standalone repo.
-- Add Python project structure.
-- Add official source manifest.
-- Add downloader, chunker, BM25 baseline, tests, Docker, CI.
+1. Improve legal chunking with article-aware and annex-aware splits.
+2. Add parent-child retrieval so precise chunks can retrieve exact evidence while larger parent spans provide enough context for generation.
+3. Expand exact citation labels from 12 high-value questions to all answerable golden questions.
+4. Try a stronger multilingual reranker such as `BAAI/bge-reranker-v2-m3`.
+5. Add Langfuse tracing for retrieval candidates, prompt context, model responses, citation validation, and latency.
+6. Expand answer-level evaluation and add manual semantic correctness labels.
 
-Deliverable:
+## Longer-Term Options
 
-- `uv run pytest` passes.
-- `uv run regurag search ...` returns sample retrieval results.
-
-## Day 2: Real Corpus Ingestion
-
-- Download sources.
-- Inspect raw extracted text.
-- Remove obvious boilerplate/noise.
-- Generate `data/processed/chunks.jsonl`.
-
-Deliverable:
-
-- 500+ source-aware chunks.
-- Each chunk has source URL, language, jurisdiction, heading, and chunk id.
-
-## Day 3: Dense Retrieval
-
-- Add Qdrant collection.
-- Use multilingual embeddings for local dense retrieval.
-- Compare BM25 vs dense retrieval on the approved golden set.
-
-Deliverable:
-
-- Retrieval report with BM25, dense, and hybrid summary metrics.
-
-## Day 4: Hybrid Retrieval and Reranking
-
-- Tune BM25 and dense retrieval with reciprocal rank fusion.
-- Add cross-encoder reranker.
-- Log before/after top-k quality.
-
-Deliverable:
-
-- Ablation table: BM25, dense, hybrid, hybrid plus rerank.
-
-## Day 5: Answer Generation and Citation Enforcement
-
-- Added LiteLLM provider adapter.
-- Added structured JSON answer output.
-- Added citation validation against retrieved chunks.
-- Added refusal guardrail for unsupported answers.
-
-Deliverable:
-
-- CLI answer command with dry-run prompt inspection and guarded generation.
-
-## Day 6: Evaluation
-
-- Build 50-question initial golden set.
-- Measure Recall@5, MRR, citation accuracy, refusal accuracy.
-- Add CI quality gate for retrieval metrics.
-
-Deliverable:
-
-- `uv run regurag eval ...` produces a report.
-
-## Day 7: System Packaging
-
-- Add simple UI.
-- Polish README.
-- Add architecture diagram.
-- Add deployment documentation.
-- Add operational runbook.
-
-Deliverable:
-
-- GitHub repo and reproducible local app.
-
-## After Week 1
-
-- Expand golden set to 100-150 questions.
-- Add Langfuse tracing.
-- Add Ragas faithfulness scoring.
-- Add German/English query rewriting.
-- Add source version monitoring.
-- Add public deployment only after API key and rate-limit strategy are clear.
+- Add German/English query rewriting for better cross-lingual retrieval.
+- Add source version monitoring for updated AI Act, GDPR, and German regulator pages.
+- Add a hosted frontend-only demo page if the repo needs a public link.
+- Add a hosted backend only after compute, model, API-key, and rate-limit strategy are clear.

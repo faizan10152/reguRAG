@@ -269,9 +269,9 @@ def query(request: QueryRequest) -> QueryResponse:
 
     citation_text = " ".join(f"[{result.citation_label}]" for result in results[:2])
     answer = (
-        "Retrieval-only MVP: these are the most relevant chunks I found. "
-        "The next milestone will add an LLM answer generator that must cite retrieved "
-        f"evidence. {citation_text}"
+        "Retrieval-only baseline: these are the most relevant BM25 chunks I found. "
+        "Use the /answer endpoint for grounded LLM answers with citation validation. "
+        f"{citation_text}"
     )
     validation = validate_citations(answer, results)
 
